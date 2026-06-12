@@ -361,6 +361,7 @@ async def revoke_auth_token(
 _MESSAGES_KEY = "chat:{session_id}:messages"
 _SESSIONS_SET = "chat:sessions"
 _SESSION_USER_KEY = "chat:{session_id}:user_id"
+_SESSION_TITLE_KEY = "chat:{session_id}:title"
 _USER_SESSIONS_KEY = "user:{user_id}:sessions"
 
 
@@ -428,6 +429,31 @@ async def get_session_user_id(
     return await valkey.get(key)
 
 
+async def set_session_title(
+    session_id: str,
+    title: str,
+    valkey: Redis | None = None,
+) -> None:
+    """Store a short human-readable title for a session."""
+    if valkey is None:
+        valkey = await get_valkey()
+
+    key = _SESSION_TITLE_KEY.format(session_id=session_id)
+    await valkey.set(key, title)
+
+
+async def get_session_title(
+    session_id: str,
+    valkey: Redis | None = None,
+) -> str | None:
+    """Return the title for a session, or ``None`` if not set."""
+    if valkey is None:
+        valkey = await get_valkey()
+
+    key = _SESSION_TITLE_KEY.format(session_id=session_id)
+    return await valkey.get(key)
+
+
 async def list_sessions(
     valkey: Redis | None = None,
 ) -> list[str]:
@@ -466,9 +492,11 @@ async def delete_session(
 
     key = _MESSAGES_KEY.format(session_id=session_id)
     session_user_key = _SESSION_USER_KEY.format(session_id=session_id)
+    session_title_key = _SESSION_TITLE_KEY.format(session_id=session_id)
     async with valkey.pipeline(transaction=True) as pipe:
         pipe.delete(key)
         pipe.delete(session_user_key)
+        pipe.delete(session_title_key)
         pipe.srem(_SESSIONS_SET, session_id)
         if user_sessions_key is not None:
             pipe.srem(user_sessions_key, session_id)

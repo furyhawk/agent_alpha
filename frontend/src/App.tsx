@@ -310,6 +310,17 @@ export default function App() {
 
   /* ── Session handlers ────────────────────────────────────────────── */
 
+  const handleNewSession = () => {
+    localStorage.removeItem(STORAGE_SESSION_KEY);
+    setSessionId("");
+    setMessages([
+      {
+        role: "assistant",
+        content: "Hello! I'm **Agent Alpha**. How can I help you today?",
+      },
+    ]);
+  };
+
   const handleViewSessions = async () => {
     if (!authenticated) return;
     try {
@@ -430,6 +441,15 @@ export default function App() {
           </span>
         </div>
 
+        {/* New Chat button */}
+        <button
+          onClick={handleNewSession}
+          className="rounded-lg border border-gray-700 px-3 py-1.5 text-sm text-gray-400 transition hover:border-indigo-500 hover:text-indigo-400"
+          title="Start a new chat"
+        >
+          + New Chat
+        </button>
+
         {/* Sessions button */}
         <button
           onClick={handleViewSessions}
@@ -505,7 +525,7 @@ export default function App() {
                     </div>
                     <div className="flex-1 truncate">
                       <p className="text-sm text-gray-200">
-                        {s.session_id.slice(0, 16)}…
+                        {s.title ?? s.session_id.slice(0, 16) + "…"}
                       </p>
                     </div>
                     <span className="text-xs text-gray-500">
@@ -515,12 +535,23 @@ export default function App() {
                 ))}
               </div>
             )}
-            <button
-              onClick={() => setShowSessions(false)}
-              className="mt-4 w-full rounded-lg border border-gray-700 px-4 py-2 text-sm text-gray-400 transition hover:bg-gray-800"
-            >
-              Close
-            </button>
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={() => {
+                  setShowSessions(false);
+                  handleNewSession();
+                }}
+                className="flex-1 rounded-lg border border-indigo-700 px-4 py-2 text-sm text-indigo-400 transition hover:bg-indigo-900/30"
+              >
+                + New Chat
+              </button>
+              <button
+                onClick={() => setShowSessions(false)}
+                className="flex-1 rounded-lg border border-gray-700 px-4 py-2 text-sm text-gray-400 transition hover:bg-gray-800"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

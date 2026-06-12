@@ -421,6 +421,7 @@ function SessionsTab({
       <table className="w-full text-left text-sm">
         <thead>
           <tr className="border-b border-gray-800 text-xs uppercase tracking-wider text-gray-500">
+            <th className="pb-3 pr-4">Title</th>
             <th className="pb-3 pr-4">Session ID</th>
             <th className="pb-3 pr-4">Messages</th>
             <th className="pb-3 pr-4">User ID</th>
@@ -430,7 +431,7 @@ function SessionsTab({
         <tbody>
           {sessions.length === 0 ? (
             <tr>
-              <td colSpan={4} className="py-8 text-center text-gray-500">
+              <td colSpan={5} className="py-8 text-center text-gray-500">
                 No sessions yet.
               </td>
             </tr>
@@ -440,9 +441,16 @@ function SessionsTab({
                 key={s.session_id}
                 className="border-b border-gray-800/50 transition hover:bg-gray-800/30"
               >
+                <td className="max-w-48 py-3 pr-4">
+                  <p className="truncate text-sm text-gray-200">
+                    {s.title ?? (
+                      <span className="text-gray-500 italic">Untitled</span>
+                    )}
+                  </p>
+                </td>
                 <td className="py-3 pr-4">
-                  <code className="text-xs text-gray-300">
-                    {s.session_id.slice(0, 16)}…
+                  <code className="text-xs text-gray-500">
+                    {s.session_id.slice(0, 12)}…
                   </code>
                 </td>
                 <td className="py-3 pr-4 text-gray-400">{s.message_count}</td>

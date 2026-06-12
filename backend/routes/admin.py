@@ -16,6 +16,7 @@ from backend.core.database import (
     delete_user as db_delete_user,
     get_admin_stats,
     get_session_messages,
+    get_session_title,
     get_session_user_id,
     get_user,
     get_user_by_username,
@@ -95,6 +96,7 @@ class AdminUserUpdate(BaseModel):
 
 class AdminSessionOut(BaseModel):
     session_id: str
+    title: str | None = None
     message_count: int
     user_id: str | None = None
 
@@ -194,9 +196,11 @@ async def admin_list_sessions(
     for sid in ids:
         msgs = await get_session_messages(sid)
         uid = await get_session_user_id(sid)
+        title = await get_session_title(sid)
         result.append(
             AdminSessionOut(
                 session_id=sid,
+                title=title,
                 message_count=len(msgs),
                 user_id=uid,
             )

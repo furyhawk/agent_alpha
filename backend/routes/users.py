@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.database import (
     create_user,
+    get_session_title,
     get_user,
     get_user_by_username,
     list_user_sessions,
@@ -55,6 +56,7 @@ class UserOut(BaseModel):
 
 class UserSessionOut(BaseModel):
     session_id: str
+    title: str | None = None
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
@@ -145,4 +147,8 @@ async def user_sessions_endpoint(
 ) -> list[UserSessionOut]:
     """List all session IDs associated with a user."""
     session_ids = await list_user_sessions(str(user_id))
-    return [UserSessionOut(session_id=sid) for sid in session_ids]
+    result: list[UserSessionOut] = []
+    for sid in session_ids:
+        title = await get_session_title(sid)
+        result.append(UserSessionOut(session_id=sid, title=title))
+    return result

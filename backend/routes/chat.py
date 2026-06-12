@@ -14,10 +14,12 @@ from pydantic import BaseModel
 from backend.core.agent import AgentService
 from backend.core.database import (
     get_session_messages,
+    get_session_title,
     get_session_user_id,
     list_sessions,
     resolve_auth_token,
     save_message,
+    set_session_title,
 )
 from backend.core.dependencies import get_agent_service
 
@@ -43,6 +45,7 @@ class MessageOut(BaseModel):
 
 class SessionOut(BaseModel):
     session_id: str
+    title: str | None = None
     message_count: int
     user_id: str | None = None
 
@@ -89,6 +92,14 @@ async def chat_endpoint(
             user_id=user_id,
         )
 
+        # Generate a short title from the first user message if not yet set.
+        existing_title = await get_session_title(session_id)
+        if existing_title is None:
+            title = body.message.strip()[:60]
+            if len(body.message.strip()) > 60:
+                title += "…"
+            await set_session_title(session_id, title or "New chat")
+
         # Ask the agent.
         output = await agent.ask(body.message, session_id=session_id)
 
@@ -133,9 +144,13 @@ async def sessions_list(
     for sid in ids:
         msgs = await get_session_messages(sid)
         uid = await get_session_user_id(sid)
+        title = await get_session_title(sid)
         result.append(
             SessionOut(
-                session_id=sid, message_count=len(msgs), user_id=uid
+                session_id=sid,
+                title=title,
+                message_count=len(msgs),
+                user_id=uid,
             )
         )
     return result

@@ -36,6 +36,7 @@ export interface MessageData {
 
 export interface SessionData {
   session_id: string;
+  title: string | null;
   message_count: number;
   user_id: string | null;
 }
@@ -74,6 +75,7 @@ export interface UserCreateData {
 
 export interface UserSessionData {
   session_id: string;
+  title: string | null;
 }
 
 /* ── Auth API ──────────────────────────────────────────────────── */
@@ -241,6 +243,7 @@ export interface AdminUserData {
 
 export interface AdminSessionData {
   session_id: string;
+  title: string | null;
   message_count: number;
   user_id: string | null;
 }
