@@ -32,6 +32,7 @@ class AgentService:
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
         self._agent: Agent | None = None
+        self._model: OpenAIResponsesModel | None = None
 
     # ── Lifecycle ──────────────────────────────────────────────────────────
 
@@ -40,16 +41,23 @@ class AgentService:
         if self._agent is not None:
             return
 
-        logfire.configure()
-        logfire.instrument_pydantic_ai()
+        if self._settings.logfire_token:
+            try:
+                logfire.configure(token=self._settings.logfire_token)
+                logfire.instrument_pydantic_ai()
+            except Exception:
+                pass  # Logfire is optional — don't crash if it fails
 
-        model = OpenAIResponsesModel(
+        self._model = OpenAIResponsesModel(
             self._settings.llm_model,
-            provider=OpenAIProvider(base_url=self._settings.llm_base_url),
+            provider=OpenAIProvider(
+                base_url=self._settings.llm_base_url,
+                api_key=self._settings.llm_api_key or "no-key-required",
+            ),
         )
 
         self._agent = Agent(
-            model,
+            self._model,
             capabilities=self._build_capabilities(),
         )
 
@@ -69,8 +77,7 @@ class AgentService:
 
     # ── Internal helpers ───────────────────────────────────────────────────
 
-    @staticmethod
-    def _build_capabilities() -> list:
+    def _build_capabilities(self) -> list:
         """Assemble the full list of agent capabilities."""
         return [
             CodeMode(),
@@ -89,7 +96,8 @@ class AgentService:
                         description="Deep research on a topic",
                         instructions="You are a thorough research assistant.",
                     ),
-                ]
+                ],
+                default_model=self._model,
             ),
             TodoCapability(enable_subtasks=True),
             CostTracking(budget_usd=5.0),

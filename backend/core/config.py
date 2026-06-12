@@ -22,6 +22,8 @@ class Settings(BaseSettings):
 
     llm_base_url: str = "http://localhost:11434/v1"
     llm_model: str = "llama"
+    llm_api_key: str = ""
+    logfire_token: str = ""
 
     # ── Factories ──────────────────────────────────────────────────────────
 

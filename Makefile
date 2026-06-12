@@ -1,5 +1,11 @@
 .PHONY: install run dev clean setup \
-        frontend-install frontend-dev frontend-build
+        frontend-install frontend-dev frontend-build \
+        compose-up compose-down compose-build compose-logs compose-rebuild
+
+# ── Container runtime detection (Docker / Podman) ─────────────────────────
+# Uses Docker if available, otherwise falls back to Podman.
+DOCKER := $(shell command -v docker 2>/dev/null || command -v podman 2>/dev/null)
+DOCKER_COMPOSE := $(shell command -v docker-compose 2>/dev/null || (command -v docker 2>/dev/null && echo "docker compose") || (command -v podman 2>/dev/null && echo "podman compose"))
 
 # ── Backend Setup ──────────────────────────────────────────────────────────
 
@@ -31,6 +37,23 @@ frontend-dev:                      ## Start the Vite dev server
 
 frontend-build:                    ## Build frontend for production
 	cd frontend && bun run build
+
+# ── Containers (Docker / Podman) ───────────────────────────────────────────
+
+compose-up:                        ## Start all containers in detached mode
+	$(DOCKER_COMPOSE) up -d
+
+compose-down:                      ## Stop and remove containers
+	$(DOCKER_COMPOSE) down
+
+compose-build:                     ## Build (or rebuild) all container images
+	$(DOCKER_COMPOSE) build
+
+compose-rebuild:                   ## Rebuild images & restart containers
+	$(DOCKER_COMPOSE) up -d --build
+
+compose-logs:                      ## Follow container logs
+	$(DOCKER_COMPOSE) logs -f
 
 # ── Utilities ──────────────────────────────────────────────────────────────
 
