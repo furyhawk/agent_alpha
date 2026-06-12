@@ -9,10 +9,20 @@ Usage::
 
     valkey = await get_valkey()
     await valkey.set("key", "value")
+
+
+Chat persistence (Valkey)::
+
+    from backend.core.database import save_message, get_session_messages
+
+    await save_message("session-1", "user", "Hello!")
+    messages = await get_session_messages("session-1")
 """
 
 from __future__ import annotations
 
+import json
+from datetime import datetime, timezone
 from typing import AsyncIterator
 
 from redis.asyncio import Redis
@@ -88,3 +98,73 @@ async def close_valkey() -> None:
 async def close_engine() -> None:
     """Dispose the SQLAlchemy engine (call on shutdown)."""
     await _engine.dispose()
+
+
+# ── Chat persistence (Valkey) ─────────────────────────────────────────────
+
+_MESSAGES_KEY = "chat:{session_id}:messages"
+_SESSIONS_SET = "chat:sessions"
+
+
+async def save_message(
+    session_id: str,
+    role: str,
+    content: str,
+    valkey: Redis | None = None,
+) -> None:
+    """Append a chat message to the session history in Valkey."""
+    if valkey is None:
+        valkey = await get_valkey()
+
+    msg = {
+        "role": role,
+        "content": content,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    key = _MESSAGES_KEY.format(session_id=session_id)
+    async with valkey.pipeline(transaction=True) as pipe:
+        pipe.rpush(key, json.dumps(msg))
+        pipe.sadd(_SESSIONS_SET, session_id)
+        await pipe.execute()
+
+
+async def get_session_messages(
+    session_id: str,
+    valkey: Redis | None = None,
+) -> list[dict[str, str]]:
+    """Return all messages for a session as a list of dicts.
+
+    Each message has keys ``role``, ``content``, ``timestamp``.
+    Returns an empty list if the session does not exist.
+    """
+    if valkey is None:
+        valkey = await get_valkey()
+
+    key = _MESSAGES_KEY.format(session_id=session_id)
+    raw = await valkey.lrange(key, 0, -1)
+    return [json.loads(item) for item in raw]
+
+
+async def list_sessions(
+    valkey: Redis | None = None,
+) -> list[str]:
+    """Return all known session IDs."""
+    if valkey is None:
+        valkey = await get_valkey()
+
+    return sorted(await valkey.smembers(_SESSIONS_SET))
+
+
+async def delete_session(
+    session_id: str,
+    valkey: Redis | None = None,
+) -> None:
+    """Delete a session and its messages from Valkey."""
+    if valkey is None:
+        valkey = await get_valkey()
+
+    key = _MESSAGES_KEY.format(session_id=session_id)
+    async with valkey.pipeline(transaction=True) as pipe:
+        pipe.delete(key)
+        pipe.srem(_SESSIONS_SET, session_id)
+        await pipe.execute()

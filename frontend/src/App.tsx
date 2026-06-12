@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { sendMessage, type ChatResponse } from "./api";
+import { sendMessage, getHistory, type MessageData } from "./api";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -10,18 +10,59 @@ interface Message {
   content: string;
 }
 
+const STORAGE_KEY = "agent_alpha_session_id";
+
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
 export default function App() {
-  const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: "Hello! I'm **Agent Alpha**. How can I help you today?" },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [sessionId, setSessionId] = useState<string | undefined>();
+  const [sessionId, setSessionId] = useState<string>(() => {
+    return localStorage.getItem(STORAGE_KEY) ?? "";
+  });
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  /* Restore chat history on mount */
+  useEffect(() => {
+    const sid = localStorage.getItem(STORAGE_KEY);
+    if (sid) {
+      getHistory(sid)
+        .then((history: MessageData[]) => {
+          if (history.length > 0) {
+            setMessages(
+              history.map((m) => ({ role: m.role, content: m.content })),
+            );
+          } else {
+            setMessages([
+              {
+                role: "assistant",
+                content:
+                  "Hello! I'm **Agent Alpha**. How can I help you today?",
+              },
+            ]);
+          }
+        })
+        .catch(() => {
+          setMessages([
+            {
+              role: "assistant",
+              content:
+                "Hello! I'm **Agent Alpha**. How can I help you today?",
+            },
+          ]);
+        });
+    } else {
+      setMessages([
+        {
+          role: "assistant",
+          content: "Hello! I'm **Agent Alpha**. How can I help you today?",
+        },
+      ]);
+    }
+  }, []);
 
   /* Auto-scroll on new messages */
   useEffect(() => {
@@ -38,8 +79,10 @@ export default function App() {
     setLoading(true);
 
     try {
-      const data: ChatResponse = await sendMessage(text, sessionId);
-      setSessionId(data.session_id ?? undefined);
+      const data = await sendMessage(text, sessionId || undefined);
+      // Persist session_id so future refreshes restore history.
+      localStorage.setItem(STORAGE_KEY, data.session_id);
+      setSessionId(data.session_id);
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: data.reply },
