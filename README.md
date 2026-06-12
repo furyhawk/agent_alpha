@@ -8,13 +8,16 @@ An agentic AI application built with **pydantic-ai**, featuring a FastAPI backen
 
 ```
 agent_alpha/
-├── agent_a.py              # Standalone agent runner (CLI)
+├── .env.example             # Environment variable template
+├── .gitignore
+├── Makefile                 # Common dev commands
 ├── pyproject.toml           # Python deps & metadata
 ├── backend/
 │   ├── app.py               # FastAPI application factory
 │   ├── main.py              # Uvicorn entry point
 │   ├── core/
-│   │   └── agent.py         # Agent lifecycle & inference
+│   │   ├── agent.py         # Agent lifecycle & inference
+│   │   └── config.py        # pydantic-settings config
 │   └── routes/
 │       ├── chat.py          # POST /api/chat
 │       └── health.py        # GET  /api/health
@@ -36,30 +39,52 @@ agent_alpha/
 
 ## Quick Start
 
-### 1. Python environment
+### 1. Configuration
 
 ```bash
-uv sync                     # Create .venv & install deps
+cp .env.example .env   # then edit .env with your LLM endpoint & model
 ```
 
 ### 2. Backend (FastAPI)
 
 ```bash
-uv run python -m backend.main
-# → http://localhost:8000
-# → API docs at http://localhost:8000/docs
+make install            # uv sync — create .venv & install deps
+make run                # → http://localhost:8000
+                        # → API docs at http://localhost:8000/docs
 ```
 
 ### 3. Frontend (React + Vite)
 
 ```bash
-cd frontend
-npm install
-npm run dev
-# → http://localhost:5173
+make frontend-install   # bun install
+make frontend-dev       # → http://localhost:5173
 ```
 
 The Vite dev server proxies `/api/*` requests to the FastAPI backend.
+
+---
+
+## Makefile Commands
+
+| Command                  | Description                          |
+| ------------------------ | ------------------------------------ |
+| `make install`           | Install Python deps via `uv sync`    |
+| `make run` / `make dev`  | Start the FastAPI backend (reload)   |
+| `make frontend-install`  | Install frontend deps via `bun`      |
+| `make frontend-dev`      | Start the Vite dev server            |
+| `make frontend-build`    | Build frontend for production        |
+| `make clean`             | Remove caches and build artifacts    |
+
+---
+
+## Configuration
+
+Environment variables are loaded from `.env` via **pydantic-settings** (see `backend/core/config.py`).
+
+| Variable       | Default                       | Description           |
+| -------------- | ----------------------------- | --------------------- |
+| `LLM_BASE_URL` | `http://localhost:11434/v1`   | OpenAI-compatible API |
+| `LLM_MODEL`    | `llama`                       | Model name to use     |
 
 ---
 
@@ -88,7 +113,7 @@ The Vite dev server proxies `/api/*` requests to the FastAPI backend.
 - **Web search** (DuckDuckGo / provider-adaptive)
 - **MCP tool integration** (Hacker News, etc.)
 - **Context management** (sliding window + LLM compaction)
-- **Memory persistence** (`./MEMORY.md`)
+- **Memory persistence**
 - **Sub-agents** (e.g., `researcher`)
 - **Task tracking** with subtask support
 - **Safety shields**: cost caps, input guards, tool approval, secret redaction, stuck-loop detection
