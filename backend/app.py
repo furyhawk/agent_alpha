@@ -12,6 +12,7 @@ from uvicorn.logging import DefaultFormatter
 from backend.core.config import Settings
 from backend.core.database import close_engine, close_valkey, init_db
 from backend.core.dependencies import get_agent_service
+from backend.routes.admin import router as admin_router
 from backend.routes.auth import router as auth_router
 from backend.routes.chat import router as chat_router
 from backend.routes.health import router as health_router
@@ -64,6 +65,7 @@ class AppBuilder:
             allow_headers=["*"],
         )
 
+        app.include_router(admin_router)
         app.include_router(auth_router)
         app.include_router(health_router)
         app.include_router(chat_router)

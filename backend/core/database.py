@@ -448,3 +448,61 @@ async def delete_session(
         if user_sessions_key is not None:
             pipe.srem(user_sessions_key, session_id)
         await pipe.execute()
+
+
+# ── Admin stats ────────────────────────────────────────────────────────────
+
+
+async def get_admin_stats(
+    session: AsyncSession | None = None,
+    valkey: Redis | None = None,
+) -> dict[str, object]:
+    """Return high-level system statistics for the admin dashboard."""
+    if session is None:
+        async with _session_factory() as session:
+            return await _gather_stats(session, valkey)
+    return await _gather_stats(session, valkey)
+
+
+async def _gather_stats(
+    session: AsyncSession,
+    valkey: Redis | None = None,
+) -> dict[str, object]:
+    """Internal: gather all stats in one place."""
+    from sqlalchemy import func as sa_func
+
+    # Total users
+    result = await session.execute(sa_func.count(User.id))
+    total_users: int = result.scalar() or 0
+
+    # Users by role
+    result = await session.execute(
+        select(User.role, sa_func.count(User.id)).group_by(User.role)
+    )
+    users_by_role: dict[str, int] = {
+        row[0]: row[1] for row in result
+    }
+
+    # Active vs inactive
+    result = await session.execute(
+        select(User.is_active, sa_func.count(User.id)).group_by(User.is_active)
+    )
+    users_by_active: dict[str, int] = {
+        "active": 0,
+        "inactive": 0,
+    }
+    for row in result:
+        key = "active" if row[0] else "inactive"
+        users_by_active[key] = row[1]
+
+    # Sessions from Valkey
+    if valkey is None:
+        valkey = await get_valkey()
+    total_sessions = await valkey.scard(_SESSIONS_SET)
+
+    return {
+        "total_users": total_users,
+        "users_by_role": users_by_role,
+        "users_by_active": users_by_active,
+        "total_sessions": total_sessions,
+    }

@@ -217,3 +217,90 @@ export async function getUserSessions(
   }
   return res.json();
 }
+
+/* ── Admin API ─────────────────────────────────────────────────── */
+
+export interface AdminStats {
+  total_users: number;
+  users_by_role: Record<string, number>;
+  users_by_active: Record<string, number>;
+  total_sessions: number;
+}
+
+export interface AdminUserData {
+  id: string;
+  username: string;
+  display_name: string;
+  role: string;
+  team: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  session_count: number;
+}
+
+export interface AdminSessionData {
+  session_id: string;
+  message_count: number;
+  user_id: string | null;
+}
+
+export async function getAdminStats(): Promise<AdminStats> {
+  const res = await fetch(`${API_BASE}/admin/stats`, {
+    headers: { ...authHeaders() },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function adminListUsers(): Promise<AdminUserData[]> {
+  const res = await fetch(`${API_BASE}/admin/users`, {
+    headers: { ...authHeaders() },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function adminUpdateUser(
+  userId: string,
+  data: { role?: string; is_active?: boolean; display_name?: string; team?: string | null },
+): Promise<AdminUserData> {
+  const res = await fetch(`${API_BASE}/admin/users/${userId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function adminListSessions(): Promise<AdminSessionData[]> {
+  const res = await fetch(`${API_BASE}/admin/sessions`, {
+    headers: { ...authHeaders() },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function adminDeleteSession(sessionId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/admin/sessions/${sessionId}`, {
+    method: "DELETE",
+    headers: { ...authHeaders() },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? `HTTP ${res.status}`);
+  }
+}

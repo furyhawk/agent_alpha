@@ -12,15 +12,20 @@ agent_alpha/
 │   ├── core/
 │   │   ├── agent.py   # AgentService (lazy init, capabilities)
 │   │   ├── config.py  # pydantic-settings from .env
-│   │   ├── database.py# SQLAlchemy async engine + Valkey client
-│   │   └── dependencies.py  # FastAPI DI providers
+│   │   ├── database.py# SQLAlchemy async engine + Valkey client + migrations
+│   │   ├── dependencies.py  # FastAPI DI providers
+│   │   └── models.py  # SQLAlchemy ORM models (User)
 │   └── routes/
-│       ├── chat.py    # POST /api/chat
-│       └── health.py  # GET /api/health
+│       ├── admin.py   # GET /api/admin/* (admin dashboard — stats, users, sessions)
+│       ├── auth.py    # POST /api/auth/{login,register,logout}, GET /api/auth/me
+│       ├── chat.py    # POST /api/chat, GET /api/chat/{history,sessions}
+│       ├── health.py  # GET /api/health
+│       └── users.py   # CRUD /api/users
 ├── frontend/          # React + Vite SPA
 │   ├── src/
-│   │   ├── App.tsx    # Chat UI component
-│   │   └── api.ts     # Fetch client
+│   │   ├── Admin.tsx  # Admin dashboard (overview, users, sessions tabs)
+│   │   ├── App.tsx    # Auth + Chat UI + admin routing
+│   │   └── api.ts     # Fetch client (chat, auth, users, admin)
 │   └── nginx.conf     # Production SPA + API proxy
 ├── skills/            # pydantic-ai skill definitions
 └── docker-compose.yml # Full stack orchestration
@@ -72,12 +77,12 @@ make compose-down       # Stop everything
 - **Functional components** only (hooks, no classes).
 - **Interfaces** at file top, exported when reused.
 - **Tailwind utility classes** inline; no CSS modules or styled-components.
-- **API client** isolated in `api.ts` — one `sendMessage()` export.
+- **API client** isolated in `api.ts` — exports for chat (`sendMessage`, `getHistory`), auth (`login`, `register`, `getMe`, `logout`), users (`listUsers`, `createUser`, `getUserSessions`), and admin (`getAdminStats`, `adminListUsers`, `adminUpdateUser`, `adminListSessions`, `adminDeleteSession`). Auth token managed via `localStorage` + `Authorization: Bearer` header helpers.
 
 ## Key Architecture Decisions
 
 ### Dependency Injection
-`dependencies.py` provides `get_settings()` and `get_agent_service()` as FastAPI `Depends()` callables. `AgentService` is lazily initialized (not built at import time). `AppBuilder` accepts optional `Settings` for test overrides.
+`dependencies.py` provides `get_settings()`, `get_agent_service()`, and `get_db_session()` as FastAPI `Depends()` callables. `AgentService` is lazily initialized (not built at import time). `AppBuilder` accepts optional `Settings` for test overrides.
 
 ### Capabilities Stack
 Agent capabilities are assembled in `AgentService._build_capabilities()` — a list that includes code execution, web search, MCP, sub-agents, cost tracking, input/tool guards, secret redaction, and stuck-loop detection.
@@ -90,10 +95,12 @@ Environment variables loaded from `.env` via `pydantic-settings` (`backend/core/
 
 ## Common Pitfalls
 
-1. **Container DNS caching**: nginx caches DNS at startup. Use `resolver` directive + variable in `proxy_pass` for runtime resolution (see `frontend/nginx.conf`).
+1. **Container DNS caching**: nginx caches DNS at startup. Podman does not use Docker's `127.0.0.11` resolver, so the `resolver` + variable trick doesn't work. If the backend restarts, also restart the frontend container (`podman compose restart frontend`).
 2. **Slow LLM responses**: The LLM may take minutes to respond. Nginx `proxy_read_timeout` is set to 600s. Backend timeouts should match.
 3. **Logfire is optional**: `logfire.configure()` is wrapped in `try/except` — omit `LOGFIRE_TOKEN` to disable.
 4. **API key for local LLMs**: Set `LLM_API_KEY=no-key-required` (or leave empty) for Ollama/local endpoints; the OpenAI client requires a non-None value.
 5. **uv vs pip**: Always use `uv sync` / `uv add`, never `pip install`. The lock file is `uv.lock`.
 6. **bun for frontend**: Use `bun install` / `bun run dev` for frontend, not `npm`.
 7. **Container orchestration**: Backend depends on postgres + valkey being healthy. Use `depends_on` with `condition: service_healthy`.
+8. **Schema migrations**: `init_db()` in `database.py` runs `Base.metadata.create_all` followed by `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` for new columns. Existing tables are never rebuilt — new columns are added in-place.
+9. **bcrypt on container restart**: `bcrypt` is a native dependency. If the container fails to start with an import error, ensure `bcrypt` is in `pyproject.toml` and `uv sync` was run during the Docker build.

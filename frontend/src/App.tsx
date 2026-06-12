@@ -13,6 +13,7 @@ import {
   type AuthResponse,
   type UserSessionData,
 } from "./api";
+import AdminDashboard from "./Admin";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -219,6 +220,9 @@ export default function App() {
   );
   const [authReady, setAuthReady] = useState(false);
 
+  /* ── Admin state ──────────────────────────────────────────────────── */
+  const [showAdmin, setShowAdmin] = useState(false);
+
   /* ── Session sidebar state ───────────────────────────────────────── */
   const [userSessions, setUserSessions] = useState<UserSessionData[]>([]);
   const [showSessions, setShowSessions] = useState(false);
@@ -390,6 +394,12 @@ export default function App() {
     return <AuthPage onAuth={handleAuth} />;
   }
 
+  /* ── Admin UI ────────────────────────────────────────────────────── */
+
+  if (showAdmin && authenticated.role === "admin") {
+    return <AdminDashboard onBack={() => setShowAdmin(false)} />;
+  }
+
   /* ── Chat UI ─────────────────────────────────────────────────────── */
 
   return (
@@ -428,6 +438,20 @@ export default function App() {
         >
           Sessions
         </button>
+
+        {/* Admin button — only for admin role */}
+        {authenticated.role === "admin" && (
+          <button
+            onClick={() => setShowAdmin(true)}
+            className="rounded-lg border border-gray-700 px-3 py-1.5 text-sm text-purple-400 transition hover:border-purple-500 hover:text-purple-300"
+            title="Admin dashboard"
+          >
+            <svg className="mr-1 inline-block h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            Admin
+          </button>
+        )}
 
         {/* Logout button */}
         <button
