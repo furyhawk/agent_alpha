@@ -91,11 +91,17 @@ async def register_endpoint(
             detail=f"User '{body.username}' already exists",
         )
 
+    # First user to register becomes an admin automatically.
+    from backend.core.database import count_users
+
+    total_users = await count_users(session=session)
+    role = "admin" if total_users == 0 else body.role
+
     user = await create_user_with_password(
         username=body.username,
         display_name=body.display_name,
         password=body.password,
-        role=body.role,
+        role=role,
         team=body.team,
         session=session,
     )

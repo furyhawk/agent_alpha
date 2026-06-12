@@ -216,6 +216,18 @@ async def list_users(
     return list(result.scalars().all())
 
 
+async def count_users(
+    session: AsyncSession | None = None,
+) -> int:
+    """Return the total number of users (including inactive)."""
+    if session is None:
+        async with _session_factory() as session:
+            result = await session.execute(select(User))
+            return len(result.scalars().all())
+    result = await session.execute(select(User))
+    return len(result.scalars().all())
+
+
 async def update_user(
     user_id: uuid.UUID,
     session: AsyncSession,
