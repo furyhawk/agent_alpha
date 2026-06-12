@@ -1,0 +1,63 @@
+# ──────────────────────────────────────────────────────────────────
+#  Agent Alpha — Docker Compose
+#
+#  Usage:
+#    docker compose up -d              # start everything
+#    docker compose up -d --build      # rebuild & start
+#    docker compose down               # stop & remove
+#
+#  Requires:
+#    - Docker (or Podman with docker-compose compatibility)
+#    - An OpenAI-compatible LLM endpoint (set LLM_BASE_URL)
+# ──────────────────────────────────────────────────────────────────
+
+services:
+  # ── FastAPI Backend ─────────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: agent-alpha-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - LLM_BASE_URL=${LLM_BASE_URL:-http://host.docker.internal:11434/v1}
+      - LLM_MODEL=${LLM_MODEL:-llama}
+    restart: unless-stopped
+    # Uncomment to use a local .env file instead of env vars:
+    # env_file:
+    #   - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # ── React Frontend (nginx) ──────────────────────────────────────
+  frontend:
+    build:
+      context: frontend
+      dockerfile: Dockerfile
+    container_name: agent-alpha-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # ── Ollama (optional — uncomment to run the LLM locally) ────────
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: ollama
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   restart: unless-stopped
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: all
+  #             capabilities: [gpu]
+
+# volumes:
+#   ollama_data:
