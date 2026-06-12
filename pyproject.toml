@@ -1,0 +1,16 @@
+[project]
+name = "agent-alpha"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "logfire[asyncpg,fastapi,httpx,sqlite3]>=4.36.0",
+    "pydantic-ai-backend>=0.2.11",
+    "pydantic-ai-harness[code-mode]>=0.3.0",
+    "pydantic-ai-shields>=0.3.4",
+    "pydantic-ai-skills>=0.11.0",
+    "pydantic-ai-slim[duckduckgo,mcp,openai]>=1.107.0",
+    "pydantic-ai-todo>=0.2.4",
+    "pydantic-deep>=0.3.28",
+]
