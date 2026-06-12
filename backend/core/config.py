@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     logfire_token: str = ""
 
+    database_url: str = "postgresql+asyncpg://agent_alpha:agent_alpha@localhost:5432/agent_alpha"
+    valkey_url: str = "redis://localhost:6379/0"
+
     # ── Factories ──────────────────────────────────────────────────────────
 
     @classmethod

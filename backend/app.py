@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from uvicorn.logging import DefaultFormatter
 
 from backend.core.config import Settings
+from backend.core.database import close_engine, close_valkey
 from backend.core.dependencies import get_agent_service
 from backend.routes.chat import router as chat_router
 from backend.routes.health import router as health_router
@@ -81,7 +82,9 @@ class AppBuilder:
 
         # Graceful teardown on shutdown.
         await agent_service.shutdown()
-        logger.info("Agent Alpha backend shuttingdown")
+        await close_valkey()
+        await close_engine()
+        logger.info("Agent Alpha backend shutting down")
 
 
 # ---------------------------------------------------------------------------

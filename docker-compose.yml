@@ -23,7 +23,14 @@ services:
     environment:
       - LLM_BASE_URL=${LLM_BASE_URL:-http://host.docker.internal:11434/v1}
       - LLM_MODEL=${LLM_MODEL:-llama}
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://agent_alpha:agent_alpha@postgres:5432/agent_alpha}
+      - VALKEY_URL=${VALKEY_URL:-redis://valkey:6379/0}
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
     # Uncomment to use a local .env file instead of env vars:
     # env_file:
     #   - .env
@@ -40,6 +47,40 @@ services:
       - "5173:80"
     depends_on:
       - backend
+    restart: unless-stopped
+
+  # ── PostgreSQL ──────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: agent-alpha-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: agent_alpha
+      POSTGRES_PASSWORD: agent_alpha
+      POSTGRES_DB: agent_alpha
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agent_alpha -d agent_alpha"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # ── Valkey (Redis-compatible) ──────────────────────────────────
+  valkey:
+    image: valkey/valkey:8-alpine
+    container_name: agent-alpha-valkey
+    ports:
+      - "6379:6379"
+    volumes:
+      - valkey_data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     restart: unless-stopped
 
   # ── Ollama (optional — uncomment to run the LLM locally) ────────
@@ -59,5 +100,7 @@ services:
   #             count: all
   #             capabilities: [gpu]
 
-# volumes:
+volumes:
+  postgres_data:
+  valkey_data:
 #   ollama_data:
