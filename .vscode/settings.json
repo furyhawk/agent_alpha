@@ -1,5 +1,7 @@
 {
     "chat.tools.terminal.autoApprove": {
-        "cp": true
+        "cp": true,
+        "bun": true,
+        "npx tsc": true
     }
 }

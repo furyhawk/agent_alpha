@@ -1,18 +1,20 @@
 """Chat API endpoint — sends prompts to the agent and returns replies.
 
 Messages are persisted in Valkey so chat history survives server restarts.
+Sessions can optionally be linked to a user for session/role management.
 """
 
 from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from backend.core.agent import AgentService
 from backend.core.database import (
     get_session_messages,
+    get_session_user_id,
     list_sessions,
     save_message,
 )
@@ -24,6 +26,7 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 class ChatRequest(BaseModel):
     message: str
     session_id: str | None = None
+    user_id: str | None = None
 
 
 class ChatResponse(BaseModel):
@@ -40,6 +43,7 @@ class MessageOut(BaseModel):
 class SessionOut(BaseModel):
     session_id: str
     message_count: int
+    user_id: str | None = None
 
 
 # ── POST /api/chat ────────────────────────────────────────────────────────
@@ -54,12 +58,18 @@ async def chat_endpoint(
 
     Saves both the user message and the assistant reply to Valkey.
     Assigns a new UUID ``session_id`` if none was provided.
+    If ``user_id`` is provided, the session is linked to that user.
     """
     session_id = body.session_id or uuid.uuid4().hex
 
     try:
-        # Persist the user message.
-        await save_message(session_id, "user", body.message)
+        # Persist the user message (linked to user if provided).
+        await save_message(
+            session_id,
+            "user",
+            body.message,
+            user_id=body.user_id,
+        )
 
         # Ask the agent.
         output = await agent.ask(body.message, session_id=session_id)
@@ -75,10 +85,6 @@ async def chat_endpoint(
 # ── GET /api/chat/history ─────────────────────────────────────────────────
 
 
-class HistoryParams(BaseModel):
-    session_id: str
-
-
 @router.get("/history", response_model=list[MessageOut])
 async def get_history(session_id: str) -> list[MessageOut]:
     """Return all messages for a given session."""
@@ -90,11 +96,28 @@ async def get_history(session_id: str) -> list[MessageOut]:
 
 
 @router.get("/sessions", response_model=list[SessionOut])
-async def sessions_list() -> list[SessionOut]:
-    """Return all known session IDs with their message counts."""
-    ids = await list_sessions()
+async def sessions_list(
+    user_id: str | None = Query(None, description="Filter by user ID"),
+) -> list[SessionOut]:
+    """Return all known session IDs with their message counts.
+
+    If ``user_id`` is provided, only sessions belonging to that user
+    are returned.
+    """
+    if user_id is not None:
+        from backend.core.database import list_user_sessions
+
+        ids = await list_user_sessions(user_id)
+    else:
+        ids = await list_sessions()
+
     result: list[SessionOut] = []
     for sid in ids:
         msgs = await get_session_messages(sid)
-        result.append(SessionOut(session_id=sid, message_count=len(msgs)))
+        uid = await get_session_user_id(sid)
+        result.append(
+            SessionOut(
+                session_id=sid, message_count=len(msgs), user_id=uid
+            )
+        )
     return result

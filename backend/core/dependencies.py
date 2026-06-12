@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, AsyncIterator
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.agent import AgentService
+from backend.core.database import get_session as _get_db_session
 
 if TYPE_CHECKING:
     from backend.core.config import Settings
@@ -23,3 +26,9 @@ async def get_agent_service() -> AgentService:
     from backend.core.agent import get_service
 
     return get_service()
+
+
+async def get_db_session() -> AsyncIterator[AsyncSession]:
+    """Provide an async SQLAlchemy session for route dependencies."""
+    async for session in _get_db_session():
+        yield session

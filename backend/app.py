@@ -10,10 +10,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from uvicorn.logging import DefaultFormatter
 
 from backend.core.config import Settings
-from backend.core.database import close_engine, close_valkey
+from backend.core.database import close_engine, close_valkey, init_db
 from backend.core.dependencies import get_agent_service
 from backend.routes.chat import router as chat_router
 from backend.routes.health import router as health_router
+from backend.routes.users import router as users_router
 
 logger = logging.getLogger("agent_alpha")
 
@@ -64,6 +65,7 @@ class AppBuilder:
 
         app.include_router(health_router)
         app.include_router(chat_router)
+        app.include_router(users_router)
 
         return app
 
@@ -73,6 +75,9 @@ class AppBuilder:
     async def _lifespan(self, _app: FastAPI):
         """Startup / shutdown lifecycle."""
         logger.info("Agent Alpha backend starting")
+
+        # Create database tables if they don't exist.
+        await init_db()
 
         # Initialise the agent service on startup.
         agent_service = await get_agent_service()
