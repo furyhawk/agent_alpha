@@ -17,12 +17,14 @@ from pydantic_deep import MemoryCapability, StuckLoopDetection
 from pydantic_deep.deps import DeepAgentDeps
 from subagents_pydantic_ai import SubAgentCapability, SubAgentConfig
 
+from backend.core.config import settings
+
 logfire.configure()
 logfire.instrument_pydantic_ai()
 
 model = OpenAIResponsesModel(
-    "llama",
-    provider=OpenAIProvider(base_url="http://localhost:8011/v1"),
+    settings.llm_model,
+    provider=OpenAIProvider(base_url=settings.llm_base_url),
 )
 
 agent = Agent(
