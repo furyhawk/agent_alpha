@@ -2,16 +2,31 @@
 
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 
-import logfire
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from uvicorn.logging import DefaultFormatter
 
 from backend.core.config import Settings
 from backend.core.dependencies import get_agent_service
 from backend.routes.chat import router as chat_router
 from backend.routes.health import router as health_router
+
+logger = logging.getLogger("agent_alpha")
+
+
+def _configure_logging() -> None:
+    """Configure standard logging to match FastAPI/uvicorn's log format."""
+    handler = logging.StreamHandler()
+    handler.setFormatter(DefaultFormatter("%(levelprefix)s %(message)s"))
+    logging.getLogger("agent_alpha").addHandler(handler)
+    logging.getLogger("agent_alpha").setLevel(logging.INFO)
+    logging.getLogger("agent_alpha").propagate = False
+
+
+_configure_logging()
 
 
 class AppBuilder:
@@ -56,7 +71,7 @@ class AppBuilder:
     @asynccontextmanager
     async def _lifespan(self, _app: FastAPI):
         """Startup / shutdown lifecycle."""
-        logfire.info("Agent Alpha backend starting")
+        logger.info("Agent Alpha backend starting")
 
         # Initialise the agent service on startup.
         agent_service = await get_agent_service()
@@ -66,7 +81,7 @@ class AppBuilder:
 
         # Graceful teardown on shutdown.
         await agent_service.shutdown()
-        logfire.info("Agent Alpha backend shuttingdown")
+        logger.info("Agent Alpha backend shuttingdown")
 
 
 # ---------------------------------------------------------------------------
