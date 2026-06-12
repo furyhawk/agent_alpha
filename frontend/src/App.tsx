@@ -2,11 +2,15 @@ import { useState, useRef, useEffect } from "react";
 import {
   sendMessage,
   getHistory,
-  listUsers,
-  createUser,
   getUserSessions,
+  login,
+  register,
+  logout,
+  getAuthToken,
+  setAuthToken,
+  clearAuthToken,
   type MessageData,
-  type UserData,
+  type AuthResponse,
   type UserSessionData,
 } from "./api";
 
@@ -20,7 +24,6 @@ interface Message {
 }
 
 const STORAGE_SESSION_KEY = "agent_alpha_session_id";
-const STORAGE_USER_KEY = "agent_alpha_user_id";
 
 const ROLE_BADGES: Record<string, string> = {
   admin: "bg-purple-600",
@@ -29,7 +32,177 @@ const ROLE_BADGES: Record<string, string> = {
 };
 
 /* ------------------------------------------------------------------ */
-/*  Component                                                          */
+/*  Auth Page                                                          */
+/* ------------------------------------------------------------------ */
+
+function AuthPage({ onAuth }: { onAuth: (user: AuthResponse) => void }) {
+  const [mode, setMode] = useState<"login" | "register">("login");
+  const [username, setUsername] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [password, setPassword] = useState("");
+  const [team, setTeam] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setBusy(true);
+
+    try {
+      let result: AuthResponse;
+      if (mode === "login") {
+        result = await login(username, password);
+      } else {
+        result = await register(
+          username,
+          displayName || username,
+          password,
+          "user",
+          team || undefined,
+        );
+      }
+      setAuthToken(result.token);
+      onAuth(result);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Authentication failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mx-auto flex h-dvh max-w-md flex-col items-center justify-center px-6">
+      <div className="mb-8 flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-lg font-bold text-white shadow-lg shadow-indigo-500/25">
+          α
+        </div>
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Agent Alpha</h1>
+          <p className="text-xs text-gray-500">powered by pydantic-ai</p>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="w-full space-y-4">
+        <p className="text-center text-sm text-gray-400">
+          {mode === "login" ? "Sign in to your account" : "Create a new account"}
+        </p>
+
+        {error && (
+          <p className="rounded-lg bg-red-900/40 px-4 py-2 text-center text-sm text-red-400">
+            {error}
+          </p>
+        )}
+
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-400">
+            Username
+          </label>
+          <input
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            className="w-full rounded-xl border border-gray-700 bg-gray-900 px-4 py-2.5 text-sm text-gray-100 placeholder-gray-500 outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            placeholder="alice"
+            required
+            autoFocus
+          />
+        </div>
+
+        {mode === "register" && (
+          <>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-400">
+                Display Name
+              </label>
+              <input
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                className="w-full rounded-xl border border-gray-700 bg-gray-900 px-4 py-2.5 text-sm text-gray-100 placeholder-gray-500 outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                placeholder="Alice"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-400">
+                Team (optional)
+              </label>
+              <input
+                type="text"
+                value={team}
+                onChange={(e) => setTeam(e.target.value)}
+                className="w-full rounded-xl border border-gray-700 bg-gray-900 px-4 py-2.5 text-sm text-gray-100 placeholder-gray-500 outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                placeholder="Engineering"
+              />
+            </div>
+          </>
+        )}
+
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-400">
+            Password
+          </label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full rounded-xl border border-gray-700 bg-gray-900 px-4 py-2.5 text-sm text-gray-100 placeholder-gray-500 outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            placeholder="••••••••"
+            required
+            minLength={4}
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={busy}
+          className="w-full rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {busy
+            ? "Please wait…"
+            : mode === "login"
+              ? "Sign In"
+              : "Create Account"}
+        </button>
+
+        <p className="text-center text-xs text-gray-500">
+          {mode === "login" ? (
+            <>
+              Don't have an account?{" "}
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("register");
+                  setError("");
+                }}
+                className="text-indigo-400 hover:underline"
+              >
+                Register
+              </button>
+            </>
+          ) : (
+            <>
+              Already have an account?{" "}
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("login");
+                  setError("");
+                }}
+                className="text-indigo-400 hover:underline"
+              >
+                Sign In
+              </button>
+            </>
+          )}
+        </p>
+      </form>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Main App                                                           */
 /* ------------------------------------------------------------------ */
 
 export default function App() {
@@ -40,17 +213,11 @@ export default function App() {
     return localStorage.getItem(STORAGE_SESSION_KEY) ?? "";
   });
 
-  /* ── User state ──────────────────────────────────────────────────── */
-  const [users, setUsers] = useState<UserData[]>([]);
-  const [currentUser, setCurrentUser] = useState<UserData | null>(null);
-  const [showUserPanel, setShowUserPanel] = useState(false);
-  const [showCreateUser, setShowCreateUser] = useState(false);
-
-  /* ── Create user form state ──────────────────────────────────────── */
-  const [newUsername, setNewUsername] = useState("");
-  const [newDisplayName, setNewDisplayName] = useState("");
-  const [newRole, setNewRole] = useState("user");
-  const [newTeam, setNewTeam] = useState("");
+  /* ── Auth state ──────────────────────────────────────────────────── */
+  const [authenticated, setAuthenticated] = useState<AuthResponse | null>(
+    null,
+  );
+  const [authReady, setAuthReady] = useState(false);
 
   /* ── Session sidebar state ───────────────────────────────────────── */
   const [userSessions, setUserSessions] = useState<UserSessionData[]>([]);
@@ -58,25 +225,29 @@ export default function App() {
 
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  /* Load users on mount and restore selected user */
+  /* Restore auth session from stored token */
   useEffect(() => {
-    const storedUserId = localStorage.getItem(STORAGE_USER_KEY);
-
-    listUsers()
-      .then((allUsers) => {
-        setUsers(allUsers);
-        if (storedUserId) {
-          const found = allUsers.find((u) => u.id === storedUserId);
-          if (found) setCurrentUser(found);
-        }
-      })
-      .catch(() => {
-        // Users table may not exist yet — that's OK.
-      });
+    (async () => {
+      const token = getAuthToken();
+      if (!token) {
+        setAuthReady(true);
+        return;
+      }
+      try {
+        const { getMe } = await import("./api");
+        const user = await getMe();
+        setAuthenticated(user);
+      } catch {
+        clearAuthToken();
+      } finally {
+        setAuthReady(true);
+      }
+    })();
   }, []);
 
   /* Restore chat history on mount or session change */
   useEffect(() => {
+    if (!authenticated) return;
     const sid = localStorage.getItem(STORAGE_SESSION_KEY);
     if (sid) {
       getHistory(sid)
@@ -112,51 +283,33 @@ export default function App() {
         },
       ]);
     }
-  }, []);
+  }, [authenticated]);
 
   /* Auto-scroll on new messages */
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  /* ── User handlers ────────────────────────────────────────────────── */
+  /* ── Auth handlers ────────────────────────────────────────────────── */
 
-  const handleSelectUser = (user: UserData) => {
-    setCurrentUser(user);
-    localStorage.setItem(STORAGE_USER_KEY, user.id);
-    setShowUserPanel(false);
+  const handleAuth = (user: AuthResponse) => {
+    setAuthenticated(user);
   };
 
-  const handleCreateUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newUsername.trim() || !newDisplayName.trim()) return;
-
-    try {
-      const user = await createUser({
-        username: newUsername.trim(),
-        display_name: newDisplayName.trim(),
-        role: newRole,
-        team: newTeam.trim() || null,
-      });
-      setUsers((prev) => [...prev, user]);
-      setCurrentUser(user);
-      localStorage.setItem(STORAGE_USER_KEY, user.id);
-      setNewUsername("");
-      setNewDisplayName("");
-      setNewRole("user");
-      setNewTeam("");
-      setShowCreateUser(false);
-      setShowUserPanel(false);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Unknown error";
-      alert(`Failed to create user: ${msg}`);
-    }
+  const handleLogout = async () => {
+    await logout();
+    setAuthenticated(null);
+    setMessages([]);
+    setSessionId("");
+    localStorage.removeItem(STORAGE_SESSION_KEY);
   };
+
+  /* ── Session handlers ────────────────────────────────────────────── */
 
   const handleViewSessions = async () => {
-    if (!currentUser) return;
+    if (!authenticated) return;
     try {
-      const sessions = await getUserSessions(currentUser.id);
+      const sessions = await getUserSessions(authenticated.user_id);
       setUserSessions(sessions);
       setShowSessions(true);
     } catch {
@@ -169,7 +322,6 @@ export default function App() {
     localStorage.setItem(STORAGE_SESSION_KEY, sid);
     setSessionId(sid);
     setShowSessions(false);
-    // Reload messages for this session.
     getHistory(sid)
       .then((history: MessageData[]) => {
         if (history.length > 0) {
@@ -203,11 +355,8 @@ export default function App() {
     setLoading(true);
 
     try {
-      const data = await sendMessage(
-        text,
-        sessionId || undefined,
-        currentUser?.id,
-      );
+      // Auth token is sent automatically via api.ts authHeaders()
+      const data = await sendMessage(text, sessionId || undefined);
       localStorage.setItem(STORAGE_SESSION_KEY, data.session_id);
       setSessionId(data.session_id);
       setMessages((prev) => [
@@ -225,7 +374,23 @@ export default function App() {
     }
   };
 
-  /* ── Render ──────────────────────────────────────────────────────── */
+  /* ── Loading splash ──────────────────────────────────────────────── */
+
+  if (!authReady) {
+    return (
+      <div className="mx-auto flex h-dvh max-w-4xl items-center justify-center">
+        <p className="text-sm text-gray-500">Loading…</p>
+      </div>
+    );
+  }
+
+  /* ── Auth gate ──────────────────────────────────────────────────── */
+
+  if (!authenticated) {
+    return <AuthPage onAuth={handleAuth} />;
+  }
+
+  /* ── Chat UI ─────────────────────────────────────────────────────── */
 
   return (
     <div className="mx-auto flex h-dvh max-w-4xl flex-col">
@@ -242,171 +407,39 @@ export default function App() {
         </div>
 
         {/* User badge */}
-        <div className="relative">
-          <button
-            onClick={() => setShowUserPanel(!showUserPanel)}
-            className="flex items-center gap-2 rounded-lg border border-gray-700 px-3 py-1.5 text-sm transition hover:border-indigo-500"
-          >
-            {currentUser ? (
-              <>
-                <span
-                  className={`h-2 w-2 rounded-full ${ROLE_BADGES[currentUser.role] ?? "bg-gray-500"}`}
-                />
-                <span className="text-gray-200">{currentUser.display_name}</span>
-                <span className="text-xs text-gray-500">
-                  {currentUser.team ? `${currentUser.team} · ` : ""}
-                  {currentUser.role}
-                </span>
-              </>
-            ) : (
-              <span className="text-gray-400">Select user</span>
-            )}
-            <svg
-              className={`h-4 w-4 text-gray-400 transition ${showUserPanel ? "rotate-180" : ""}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-
-          {/* User dropdown panel */}
-          {showUserPanel && (
-            <div className="absolute right-0 top-full z-50 mt-2 w-64 rounded-xl border border-gray-700 bg-gray-900 p-3 shadow-2xl">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
-                Users
-              </p>
-              {users.length === 0 && (
-                <p className="py-2 text-sm text-gray-500">
-                  No users yet. Create one below.
-                </p>
-              )}
-              <div className="mb-2 max-h-48 space-y-1 overflow-y-auto">
-                {users.map((user) => (
-                  <button
-                    key={user.id}
-                    onClick={() => handleSelectUser(user)}
-                    className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition hover:bg-gray-800 ${
-                      currentUser?.id === user.id
-                        ? "bg-gray-800 ring-1 ring-indigo-500"
-                        : ""
-                    }`}
-                  >
-                    <span
-                      className={`h-2 w-2 shrink-0 rounded-full ${ROLE_BADGES[user.role] ?? "bg-gray-500"}`}
-                    />
-                    <span className="flex-1 truncate text-gray-200">
-                      {user.display_name}
-                    </span>
-                    <span className="text-xs text-gray-500">
-                      {user.team ?? user.role}
-                    </span>
-                  </button>
-                ))}
-              </div>
-              <button
-                onClick={() => {
-                  setShowUserPanel(false);
-                  setShowCreateUser(true);
-                }}
-                className="w-full rounded-lg border border-dashed border-gray-600 px-3 py-2 text-sm text-gray-400 transition hover:border-indigo-500 hover:text-indigo-400"
-              >
-                + New user
-              </button>
-            </div>
-          )}
+        <div className="flex items-center gap-2 rounded-lg border border-gray-700 px-3 py-1.5">
+          <span
+            className={`h-2 w-2 rounded-full ${ROLE_BADGES[authenticated.role] ?? "bg-gray-500"}`}
+          />
+          <span className="text-sm text-gray-200">
+            {authenticated.display_name}
+          </span>
+          <span className="text-xs text-gray-500">
+            {authenticated.team ? `${authenticated.team} · ` : ""}
+            {authenticated.role}
+          </span>
         </div>
 
         {/* Sessions button */}
-        {currentUser && (
-          <button
-            onClick={handleViewSessions}
-            className="rounded-lg border border-gray-700 px-3 py-1.5 text-sm text-gray-400 transition hover:border-indigo-500 hover:text-indigo-400"
-            title="View my sessions"
-          >
-            Sessions
-          </button>
-        )}
+        <button
+          onClick={handleViewSessions}
+          className="rounded-lg border border-gray-700 px-3 py-1.5 text-sm text-gray-400 transition hover:border-indigo-500 hover:text-indigo-400"
+          title="View my sessions"
+        >
+          Sessions
+        </button>
+
+        {/* Logout button */}
+        <button
+          onClick={handleLogout}
+          className="rounded-lg border border-gray-700 px-3 py-1.5 text-sm text-gray-500 transition hover:border-red-500 hover:text-red-400"
+          title="Sign out"
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+        </button>
       </header>
-
-      {/* ---- Create User Modal ---- */}
-      {showCreateUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <form
-            onSubmit={handleCreateUser}
-            className="w-full max-w-sm rounded-2xl border border-gray-700 bg-gray-900 p-6 shadow-2xl"
-          >
-            <h2 className="mb-4 text-lg font-semibold text-gray-100">
-              Create User
-            </h2>
-
-            <label className="mb-1 block text-xs font-medium text-gray-400">
-              Username
-            </label>
-            <input
-              type="text"
-              value={newUsername}
-              onChange={(e) => setNewUsername(e.target.value)}
-              className="mb-3 w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 outline-none focus:border-indigo-500"
-              placeholder="alice"
-              required
-            />
-
-            <label className="mb-1 block text-xs font-medium text-gray-400">
-              Display Name
-            </label>
-            <input
-              type="text"
-              value={newDisplayName}
-              onChange={(e) => setNewDisplayName(e.target.value)}
-              className="mb-3 w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 outline-none focus:border-indigo-500"
-              placeholder="Alice"
-              required
-            />
-
-            <label className="mb-1 block text-xs font-medium text-gray-400">
-              Team
-            </label>
-            <input
-              type="text"
-              value={newTeam}
-              onChange={(e) => setNewTeam(e.target.value)}
-              className="mb-3 w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 outline-none focus:border-indigo-500"
-              placeholder="Engineering (optional)"
-            />
-
-            <label className="mb-1 block text-xs font-medium text-gray-400">
-              Role
-            </label>
-            <select
-              value={newRole}
-              onChange={(e) => setNewRole(e.target.value)}
-              className="mb-4 w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 outline-none focus:border-indigo-500"
-            >
-              <option value="user">User</option>
-              <option value="admin">Admin</option>
-              <option value="viewer">Viewer</option>
-            </select>
-
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setShowCreateUser(false)}
-                className="flex-1 rounded-lg border border-gray-700 px-4 py-2 text-sm text-gray-400 transition hover:bg-gray-800"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="flex-1 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-500"
-              >
-                Create
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
 
       {/* ---- Sessions Sidebar ---- */}
       {showSessions && (
@@ -414,7 +447,7 @@ export default function App() {
           <div className="w-full max-w-md rounded-2xl border border-gray-700 bg-gray-900 p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-100">
-                Sessions — {currentUser?.display_name}
+                Sessions — {authenticated.display_name}
               </h2>
               <button
                 onClick={() => setShowSessions(false)}

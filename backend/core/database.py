@@ -36,7 +36,7 @@ from datetime import datetime, timezone
 from typing import AsyncIterator
 
 from redis.asyncio import Redis
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -63,9 +63,20 @@ _session_factory = async_sessionmaker(
 
 
 async def init_db() -> None:
-    """Create all tables if they don't exist (call on startup)."""
+    """Create all tables if they don't exist, then apply missing-column migrations.
+
+    Safe to call repeatedly — uses ``IF NOT EXISTS`` for columns and tables.
+    """
     async with _engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+        # ── Migrations: add columns that may be missing on existing tables ──
+        migrations = [
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(128)",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS team VARCHAR(100)",
+        ]
+        for stmt in migrations:
+            await conn.execute(text(stmt))
 
 
 async def get_session() -> AsyncIterator[AsyncSession]:
@@ -220,6 +231,104 @@ async def update_user(
     await session.flush()
     await session.refresh(user)
     return user
+
+
+# ── Authentication (Valkey tokens + bcrypt) ───────────────────────────────
+
+_AUTH_TOKEN_KEY = "auth_token:{token}"
+_AUTH_TOKEN_TTL = 86400 * 7  # 7 days
+
+
+async def create_user_with_password(
+    username: str,
+    display_name: str,
+    password: str,
+    role: str = "user",
+    team: str | None = None,
+    session: AsyncSession | None = None,
+) -> User:
+    """Create a new user with a hashed password."""
+    if session is None:
+        async with _session_factory() as session:
+            user = User(
+                username=username,
+                display_name=display_name,
+                role=role,
+                team=team,
+            )
+            user.set_password(password)
+            session.add(user)
+            await session.commit()
+            await session.refresh(user)
+            return user
+    else:
+        user = User(
+            username=username,
+            display_name=display_name,
+            role=role,
+            team=team,
+        )
+        user.set_password(password)
+        session.add(user)
+        await session.flush()
+        await session.refresh(user)
+        return user
+
+
+async def authenticate_user(
+    username: str,
+    password: str,
+    session: AsyncSession | None = None,
+) -> User | None:
+    """Verify username/password. Returns the User on success, ``None`` on failure."""
+    user = await get_user_by_username(username, session=session)
+    if user is None or not user.is_active:
+        return None
+    if user.check_password(password):
+        return user
+    return None
+
+
+async def create_auth_token(
+    user_id: str,
+    valkey: Redis | None = None,
+) -> str:
+    """Create an auth token for a user, stored in Valkey with TTL.
+
+    Returns the token string.
+    """
+    if valkey is None:
+        valkey = await get_valkey()
+
+    token = uuid.uuid4().hex
+    key = _AUTH_TOKEN_KEY.format(token=token)
+    await valkey.setex(key, _AUTH_TOKEN_TTL, user_id)
+    return token
+
+
+async def resolve_auth_token(
+    token: str,
+    valkey: Redis | None = None,
+) -> str | None:
+    """Resolve an auth token to a user_id string, or ``None`` if invalid/expired."""
+    if valkey is None:
+        valkey = await get_valkey()
+
+    key = _AUTH_TOKEN_KEY.format(token=token)
+    user_id = await valkey.get(key)
+    return user_id
+
+
+async def revoke_auth_token(
+    token: str,
+    valkey: Redis | None = None,
+) -> None:
+    """Delete an auth token (logout)."""
+    if valkey is None:
+        valkey = await get_valkey()
+
+    key = _AUTH_TOKEN_KEY.format(token=token)
+    await valkey.delete(key)
 
 
 # ── Chat persistence (Valkey) ─────────────────────────────────────────────

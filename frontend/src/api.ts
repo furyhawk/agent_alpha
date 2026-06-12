@@ -1,5 +1,26 @@
 const API_BASE = "/api";
 
+/* ── Token management ──────────────────────────────────────────── */
+
+const TOKEN_KEY = "agent_alpha_auth_token";
+
+export function getAuthToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setAuthToken(token: string): void {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+export function clearAuthToken(): void {
+  localStorage.removeItem(TOKEN_KEY);
+}
+
+function authHeaders(): Record<string, string> {
+  const token = getAuthToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 /* ── Chat Types ────────────────────────────────────────────────── */
 
 export interface ChatResponse {
@@ -17,6 +38,17 @@ export interface SessionData {
   session_id: string;
   message_count: number;
   user_id: string | null;
+}
+
+/* ── Auth Types ────────────────────────────────────────────────── */
+
+export interface AuthResponse {
+  token: string;
+  user_id: string;
+  username: string;
+  display_name: string;
+  role: string;
+  team: string | null;
 }
 
 /* ── User Types ────────────────────────────────────────────────── */
@@ -37,10 +69,77 @@ export interface UserCreateData {
   display_name: string;
   role?: string;
   team?: string | null;
+  password?: string;
 }
 
 export interface UserSessionData {
   session_id: string;
+}
+
+/* ── Auth API ──────────────────────────────────────────────────── */
+
+export async function login(
+  username: string,
+  password: string,
+): Promise<AuthResponse> {
+  const res = await fetch(`${API_BASE}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function register(
+  username: string,
+  displayName: string,
+  password: string,
+  role?: string,
+  team?: string,
+): Promise<AuthResponse> {
+  const res = await fetch(`${API_BASE}/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      username,
+      display_name: displayName,
+      password,
+      role: role ?? "user",
+      team: team ?? null,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function getMe(): Promise<AuthResponse> {
+  const res = await fetch(`${API_BASE}/auth/me`, {
+    headers: { ...authHeaders() },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function logout(): Promise<void> {
+  const token = getAuthToken();
+  if (!token) return;
+  await fetch(`${API_BASE}/auth/logout`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  }).catch(() => {
+    /* ignore network errors on logout */
+  });
+  clearAuthToken();
 }
 
 /* ── Send a message ────────────────────────────────────────────── */
@@ -52,7 +151,10 @@ export async function sendMessage(
 ): Promise<ChatResponse> {
   const res = await fetch(`${API_BASE}/chat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(),
+    },
     body: JSON.stringify({
       message,
       session_id: sessionId ?? null,

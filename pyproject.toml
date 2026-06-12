@@ -17,6 +17,7 @@ dependencies = [
     "pydantic-deep>=0.3.28",
     "uvicorn[standard]>=0.34.0",
     "asyncpg>=0.30.0",
+    "bcrypt>=4.2.0",
     "redis[hiredis]>=5.2.0",
     "sqlalchemy[asyncio]>=2.0.36",
 ]

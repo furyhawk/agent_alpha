@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
 
 from backend.core.agent import AgentService
@@ -16,6 +16,7 @@ from backend.core.database import (
     get_session_messages,
     get_session_user_id,
     list_sessions,
+    resolve_auth_token,
     save_message,
 )
 from backend.core.dependencies import get_agent_service
@@ -46,6 +47,20 @@ class SessionOut(BaseModel):
     user_id: str | None = None
 
 
+async def _resolve_user_id(
+    user_id: str | None = None,
+    authorization: str | None = Header(None),
+) -> str | None:
+    """Resolve the effective user_id from explicit param or auth token."""
+    if user_id is not None:
+        return user_id
+    if authorization is not None:
+        scheme, _, token = authorization.partition(" ")
+        if scheme.lower() == "bearer" and token:
+            return await resolve_auth_token(token)
+    return None
+
+
 # ── POST /api/chat ────────────────────────────────────────────────────────
 
 
@@ -53,22 +68,25 @@ class SessionOut(BaseModel):
 async def chat_endpoint(
     body: ChatRequest,
     agent: AgentService = Depends(get_agent_service),
+    user_id: str | None = Depends(_resolve_user_id),
 ) -> ChatResponse:
     """Send a user message to the agent and return its reply.
 
     Saves both the user message and the assistant reply to Valkey.
     Assigns a new UUID ``session_id`` if none was provided.
-    If ``user_id`` is provided, the session is linked to that user.
+    The chat session is automatically assigned to the authenticated user
+    (via ``Authorization: Bearer <token>`` header) or to the explicit
+    ``user_id`` field in the request body.
     """
     session_id = body.session_id or uuid.uuid4().hex
 
     try:
-        # Persist the user message (linked to user if provided).
+        # Persist the user message (linked to authenticated user).
         await save_message(
             session_id,
             "user",
             body.message,
-            user_id=body.user_id,
+            user_id=user_id,
         )
 
         # Ask the agent.
