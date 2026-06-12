@@ -233,6 +233,19 @@ async def update_user(
     return user
 
 
+async def delete_user(
+    user_id: uuid.UUID,
+    session: AsyncSession,
+) -> bool:
+    """Delete a user by their UUID. Returns ``True`` if deleted, ``False`` if not found."""
+    user = await session.get(User, user_id)
+    if user is None:
+        return False
+    await session.delete(user)
+    await session.flush()
+    return True
+
+
 # ── Authentication (Valkey tokens + bcrypt) ───────────────────────────────
 
 _AUTH_TOKEN_KEY = "auth_token:{token}"

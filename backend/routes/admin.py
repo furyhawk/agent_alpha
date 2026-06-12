@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.database import (
     delete_session,
+    delete_user as db_delete_user,
     get_admin_stats,
     get_session_messages,
     get_session_user_id,
@@ -169,6 +170,18 @@ async def admin_update_user(
 
     sids = await list_user_sessions(str(user.id))
     return _user_to_admin_out(user, session_count=len(sids))
+
+
+@router.delete("/users/{user_id}", status_code=204)
+async def admin_delete_user(
+    user_id: uuid.UUID,
+    _admin_id: str = Depends(require_admin),
+    session: AsyncSession = Depends(get_db_session),
+) -> None:
+    """Permanently delete a user and all their data."""
+    deleted = await db_delete_user(user_id, session=session)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="User not found")
 
 
 @router.get("/sessions", response_model=list[AdminSessionOut])

@@ -5,6 +5,7 @@ import {
   adminUpdateUser,
   adminListSessions,
   adminDeleteSession,
+  adminDeleteUser,
   type AdminStats,
   type AdminUserData,
   type AdminSessionData,
@@ -79,6 +80,16 @@ export default function AdminDashboard({ onBack }: AdminProps) {
       await loadAll();
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : "Update failed");
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm("Permanently delete this user and all their data?")) return;
+    try {
+      await adminDeleteUser(userId);
+      await loadAll();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Delete failed");
     }
   };
 
@@ -172,6 +183,7 @@ export default function AdminDashboard({ onBack }: AdminProps) {
             users={users}
             onRoleChange={handleRoleChange}
             onToggleActive={handleToggleActive}
+            onDeleteUser={handleDeleteUser}
           />
         ) : (
           <SessionsTab sessions={sessions} onDelete={handleDeleteSession} />
@@ -307,10 +319,12 @@ function UsersTab({
   users,
   onRoleChange,
   onToggleActive,
+  onDeleteUser,
 }: {
   users: AdminUserData[];
   onRoleChange: (id: string, role: string) => void;
   onToggleActive: (id: string, current: boolean) => void;
+  onDeleteUser: (id: string) => void;
 }) {
   return (
     <div className="overflow-x-auto">
@@ -323,6 +337,7 @@ function UsersTab({
             <th className="pb-3 pr-4">Status</th>
             <th className="pb-3 pr-4">Sessions</th>
             <th className="pb-3 pr-4">Created</th>
+            <th className="pb-3 pr-2" />
             <th className="pb-3" />
           </tr>
         </thead>
@@ -366,12 +381,21 @@ function UsersTab({
               <td className="py-3 pr-4 text-xs text-gray-500">
                 {new Date(u.created_at).toLocaleDateString()}
               </td>
-              <td className="py-3">
+              <td className="py-3 pr-2">
                 <span
                   className={`inline-block h-2 w-2 rounded-full ${
                     ROLE_COLORS[u.role]?.replace("text-", "bg-") ?? "bg-gray-500"
                   }`}
                 />
+              </td>
+              <td className="py-3">
+                <button
+                  onClick={() => onDeleteUser(u.id)}
+                  className="rounded-lg px-2 py-1 text-xs text-red-400 transition hover:bg-red-900/30"
+                  title="Delete user"
+                >
+                  Delete
+                </button>
               </td>
             </tr>
           ))}

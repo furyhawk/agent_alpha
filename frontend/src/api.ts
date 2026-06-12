@@ -294,6 +294,17 @@ export async function adminListSessions(): Promise<AdminSessionData[]> {
   return res.json();
 }
 
+export async function adminDeleteUser(userId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/admin/users/${userId}`, {
+    method: "DELETE",
+    headers: { ...authHeaders() },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? `HTTP ${res.status}`);
+  }
+}
+
 export async function adminDeleteSession(sessionId: string): Promise<void> {
   const res = await fetch(`${API_BASE}/admin/sessions/${sessionId}`, {
     method: "DELETE",

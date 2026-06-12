@@ -143,8 +143,8 @@ async def me_endpoint(
 
     Requires ``Authorization: Bearer <token>`` header.
     """
-    from backend.core.database import get_session as _get_db
     from backend.core.database import get_user
+    from backend.core.database import open_session as _open_db
 
     user_id = await resolve_auth_token(token)
     if user_id is None:
@@ -153,7 +153,7 @@ async def me_endpoint(
             detail="Invalid or expired token",
         )
 
-    async with _get_db() as session:
+    async with _open_db() as session:
         user = await get_user(uuid_obj(user_id), session=session)
 
     if user is None or not user.is_active:
