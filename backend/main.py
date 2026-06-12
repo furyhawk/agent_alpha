@@ -1,10 +1,22 @@
-"""Entry point — run with `uv run python -m backend.main` or `uvicorn backend.app:create_app`."""
+"""Entry point — run with ``uv run python -m backend.main``.
+
+The FastAPI app is created lazily inside ``if __name__`` so importing
+this module has no side effects.
+"""
 
 import uvicorn
 
-from backend.app import create_app
 
-app = create_app()
+def main() -> None:
+    """Start the Uvicorn development server."""
+    uvicorn.run(
+        "backend.app:create_app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        factory=True,
+    )
+
 
 if __name__ == "__main__":
-    uvicorn.run("backend.app:create_app", host="0.0.0.0", port=8000, reload=True, factory=True)
+    main()

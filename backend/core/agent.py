@@ -1,10 +1,12 @@
 """Agent lifecycle: builds the shared agent instance loaded by the API routes."""
 
+from __future__ import annotations
+
 import logfire
-from pydantic_ai.models.openai import OpenAIResponsesModel
-from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai import Agent
 from pydantic_ai.capabilities import MCP, Thinking, ToolSearch, WebSearch
+from pydantic_ai.models.openai import OpenAIResponsesModel
+from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai_harness import CodeMode
 
 # Community packages, alphabetical:
@@ -17,49 +19,103 @@ from pydantic_deep import MemoryCapability, StuckLoopDetection
 from pydantic_deep.deps import DeepAgentDeps
 from subagents_pydantic_ai import SubAgentCapability, SubAgentConfig
 
-from backend.core.config import settings
+from backend.core.config import Settings
 
-logfire.configure()
-logfire.instrument_pydantic_ai()
 
-model = OpenAIResponsesModel(
-    settings.llm_model,
-    provider=OpenAIProvider(base_url=settings.llm_base_url),
-)
+class AgentService:
+    """Encapsulates agent construction, execution, and teardown.
 
-agent = Agent(
-    model,
-    capabilities=[
-        CodeMode(),
-        ToolSearch(),
-        Thinking(effort="xhigh"),
-        ContextManagerCapability(max_tokens=100_000),
-        MCP("https://hn.caseyjhand.com/mcp"),
-        WebSearch(),
-        ConsoleCapability(),
-        MemoryCapability(agent_name="harness-example"),
-        SkillsCapability(directories=["./skills"]),
-        SubAgentCapability(
-            subagents=[
-                SubAgentConfig(
-                    name="researcher",
-                    description="Deep research on a topic",
-                    instructions="You are a thorough research assistant.",
-                ),
-            ]
-        ),
-        TodoCapability(enable_subtasks=True),
-        CostTracking(budget_usd=5.0),
-        InputGuard(guard=lambda p: "ignore previous instructions" not in p.lower()),
-        ToolGuard(blocked=["rm"], require_approval=["write_file"]),
-        SecretRedaction(),
-        StuckLoopDetection(),
-    ],
-)
+    Uses lazy initialization so the agent is not built at import time.
+    Accepts a ``Settings`` instance for testability (dependency injection).
+    """
+
+    def __init__(self, settings: Settings) -> None:
+        self._settings = settings
+        self._agent: Agent | None = None
+
+    # ── Lifecycle ──────────────────────────────────────────────────────────
+
+    def initialize(self) -> None:
+        """Build the agent. Idempotent — safe to call multiple times."""
+        if self._agent is not None:
+            return
+
+        logfire.configure()
+        logfire.instrument_pydantic_ai()
+
+        model = OpenAIResponsesModel(
+            self._settings.llm_model,
+            provider=OpenAIProvider(base_url=self._settings.llm_base_url),
+        )
+
+        self._agent = Agent(
+            model,
+            capabilities=self._build_capabilities(),
+        )
+
+    async def shutdown(self) -> None:
+        """Release agent resources."""
+        self._agent = None
+
+    # ── Execution ──────────────────────────────────────────────────────────
+
+    async def ask(self, prompt: str, session_id: str | None = None) -> str:
+        """Send a prompt to the agent and return the text output."""
+        self.initialize()
+        assert self._agent is not None
+        deps = DeepAgentDeps()
+        result = await self._agent.run(prompt, deps=deps)
+        return result.output
+
+    # ── Internal helpers ───────────────────────────────────────────────────
+
+    @staticmethod
+    def _build_capabilities() -> list:
+        """Assemble the full list of agent capabilities."""
+        return [
+            CodeMode(),
+            ToolSearch(),
+            Thinking(effort="xhigh"),
+            ContextManagerCapability(max_tokens=100_000),
+            MCP("https://hn.caseyjhand.com/mcp"),
+            WebSearch(),
+            ConsoleCapability(),
+            MemoryCapability(agent_name="harness-example"),
+            SkillsCapability(directories=["./skills"]),
+            SubAgentCapability(
+                subagents=[
+                    SubAgentConfig(
+                        name="researcher",
+                        description="Deep research on a topic",
+                        instructions="You are a thorough research assistant.",
+                    ),
+                ]
+            ),
+            TodoCapability(enable_subtasks=True),
+            CostTracking(budget_usd=5.0),
+            InputGuard(guard=lambda p: "ignore previous instructions" not in p.lower()),
+            ToolGuard(blocked=["rm"], require_approval=["write_file"]),
+            SecretRedaction(),
+            StuckLoopDetection(),
+        ]
+
+
+# ---------------------------------------------------------------------------
+# Singleton — lazy-initialised on the first call to ``ask()``.
+# Keeps the existing module-level ``ask`` facade so downstream imports in
+# ``chat.py`` continue to work unchanged.
+# ---------------------------------------------------------------------------
+
+from backend.core.config import settings as _settings  # noqa: E402
+
+_service = AgentService(_settings)
+
+
+def get_service() -> AgentService:
+    """Return the singleton AgentService instance."""
+    return _service
 
 
 async def ask(prompt: str, session_id: str | None = None) -> str:
     """Send a prompt to the agent and return the text output."""
-    deps = DeepAgentDeps()
-    result = await agent.run(prompt, deps=deps)
-    return result.output
+    return await _service.ask(prompt, session_id=session_id)
