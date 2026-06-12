@@ -23,10 +23,13 @@ services:
     environment:
       # NOTE: URLs are hardcoded to container service names so that the
       # host .env file (with localhost URLs) does NOT override them.
-      - LLM_BASE_URL=${LLM_BASE_URL:-http://host.docker.internal:11434/v1}
+      # LLM: use host.docker.internal (resolved via extra_hosts) so the
+      # container reaches the LLM running on the host machine.
+      - LLM_BASE_URL=http://host.docker.internal:8011/v1
       - LLM_MODEL=${LLM_MODEL:-llama}
       - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://agent_alpha:agent_alpha@postgres:5432/agent_alpha}
-      - VALKEY_URL=${VALKEY_URL:-redis://valkey:6379/0}      
+      - VALKEY_URL=${VALKEY_URL:-redis://valkey:6379/0}
+
 
     restart: unless-stopped
     depends_on:
