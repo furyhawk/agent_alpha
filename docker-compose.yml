@@ -21,10 +21,12 @@ services:
     ports:
       - "8000:8000"
     environment:
+      # NOTE: URLs are hardcoded to container service names so that the
+      # host .env file (with localhost URLs) does NOT override them.
       - LLM_BASE_URL=${LLM_BASE_URL:-http://host.docker.internal:11434/v1}
       - LLM_MODEL=${LLM_MODEL:-llama}
-      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://agent_alpha:agent_alpha@postgres:5432/agent_alpha}
-      - VALKEY_URL=${VALKEY_URL:-redis://valkey:6379/0}
+      - DATABASE_URL=postgresql+asyncpg://agent_alpha:agent_alpha@postgres:5432/agent_alpha
+      - VALKEY_URL=redis://valkey:6379/0
     restart: unless-stopped
     depends_on:
       postgres:
@@ -34,8 +36,10 @@ services:
     # Uncomment to use a local .env file instead of env vars:
     # env_file:
     #   - .env
+    # Podman: use host.containers.internal; Docker Desktop: host.docker.internal
     extra_hosts:
       - "host.docker.internal:host-gateway"
+      - "host.containers.internal:host-gateway"
 
   # ── React Frontend (nginx) ──────────────────────────────────────
   frontend:

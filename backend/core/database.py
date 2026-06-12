@@ -51,6 +51,19 @@ async def get_session() -> AsyncIterator[AsyncSession]:
             raise
 
 
+def open_session() -> AsyncSession:
+    """Return a standalone async session (for health checks, scripts, etc.).
+
+    The caller uses ``async with`` to enter/exit::
+
+        async with open_session() as session:
+            await session.execute(...)
+
+    The session is automatically closed on exit of the ``async with`` block.
+    """
+    return _session_factory()
+
+
 # ── Valkey (Redis-compatible) ─────────────────────────────────────────────
 
 _valkey: Redis | None = None
