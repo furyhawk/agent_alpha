@@ -10,7 +10,7 @@ from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai_harness import CodeMode
 
 # Community packages, alphabetical:
-from pydantic_ai_backends import ConsoleCapability
+from pydantic_ai_backends import ConsoleCapability, LocalBackend
 from pydantic_ai_shields import CostTracking, InputGuard, SecretRedaction, ToolGuard
 from pydantic_ai_skills import SkillsCapability
 from pydantic_ai_summarization import ContextManagerCapability
@@ -71,7 +71,7 @@ class AgentService:
         """Send a prompt to the agent and return the text output."""
         self.initialize()
         assert self._agent is not None
-        deps = DeepAgentDeps()
+        deps = DeepAgentDeps(backend=_backend)
         result = await self._agent.run(prompt, deps=deps)
         return result.output
 
@@ -87,7 +87,7 @@ class AgentService:
             MCP("https://hn.caseyjhand.com/mcp", native=True),
             WebSearch(local="duckduckgo"),
             ConsoleCapability(),
-            MemoryCapability(agent_name="harness-example"),
+            MemoryCapability(agent_name="harness-agent", memory_dir=_MEMORY_DIR),
             SkillsCapability(directories=["./skills"]),
             SubAgentCapability(
                 subagents=[
@@ -107,6 +107,17 @@ class AgentService:
             StuckLoopDetection(),
         ]
 
+
+# ---------------------------------------------------------------------------
+# Persistent backend — uses local filesystem so agent memory survives restarts.
+# ---------------------------------------------------------------------------
+
+import os as _os
+
+_AGENT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+_MEMORY_DIR = _os.path.join(_AGENT_ROOT, ".agent_memory")
+
+_backend = LocalBackend(root_dir=_AGENT_ROOT)
 
 # ---------------------------------------------------------------------------
 # Singleton — lazy-initialised on the first call to ``ask()``.
