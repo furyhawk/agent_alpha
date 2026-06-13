@@ -53,14 +53,21 @@ router = APIRouter(prefix="/api/rag", tags=["rag"])
 
 
 def _get_vector_store() -> VectorStore:
-    """Return a shared VectorStore instance for route handlers."""
+    """Return a shared VectorStore instance for route handlers.
+
+    Routes that don't need embeddings (collections list/info/create/delete)
+    can use this helper — it won't initialise the embedding service.
+    """
     rag_settings = settings.rag
     embed_service = EmbeddingService(settings=rag_settings)
     return VectorStore(settings=rag_settings, embedding_service=embed_service)
 
 
 def _get_ingestion_service() -> IngestionService:
-    """Return a shared IngestionService instance."""
+    """Return a shared IngestionService instance.
+
+    Requires a working embedding endpoint for document processing.
+    """
     rag_settings = settings.rag
     embed_service = EmbeddingService(settings=rag_settings)
     vector_store = VectorStore(settings=rag_settings, embedding_service=embed_service)
@@ -142,29 +149,47 @@ async def delete_collection(name: str) -> RAGMessageResponse:
 async def search_rag(
     body: RAGSearchRequest,
 ) -> RAGSearchResponse:
-    """Search across one or more collections."""
-    rag_settings = settings.rag
-    embed_service = EmbeddingService(settings=rag_settings)
-    store = VectorStore(settings=rag_settings, embedding_service=embed_service)
-    retrieval = RetrievalService(vector_store=store, settings=rag_settings)
+    """Search across one or more collections.
+
+    Requires a working embedding endpoint. Configure ``EMBEDDING_BASE_URL``
+    in your environment (defaults to ``LLM_BASE_URL``). The server must
+    support the OpenAI-compatible ``/v1/embeddings`` endpoint.
+    """
+    try:
+        rag_settings = settings.rag
+        embed_service = EmbeddingService(settings=rag_settings)
+        store = VectorStore(settings=rag_settings, embedding_service=embed_service)
+        retrieval = RetrievalService(vector_store=store, settings=rag_settings)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Failed to initialise embedding service: {exc}. "
+            f"Set EMBEDDING_BASE_URL to a server that supports /v1/embeddings.",
+        ) from exc
 
     collection_names = body.collection_names or [body.collection_name]
 
-    if len(collection_names) == 1:
-        results = await retrieval.retrieve(
-            query=body.query,
-            collection_name=collection_names[0],
-            limit=body.limit,
-            min_score=body.min_score,
-            filter=body.filter or "",
-        )
-    else:
-        results = await retrieval.retrieve_multi(
-            query=body.query,
-            collection_names=collection_names,
-            limit=body.limit,
-            min_score=body.min_score,
-        )
+    try:
+        if len(collection_names) == 1:
+            results = await retrieval.retrieve(
+                query=body.query,
+                collection_name=collection_names[0],
+                limit=body.limit,
+                min_score=body.min_score,
+                filter=body.filter or "",
+            )
+        else:
+            results = await retrieval.retrieve_multi(
+                query=body.query,
+                collection_names=collection_names,
+                limit=body.limit,
+                min_score=body.min_score,
+            )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Search failed — check EMBEDDING_BASE_URL: {exc}",
+        ) from exc
 
     return RAGSearchResponse(
         results=[

@@ -48,19 +48,34 @@ class OpenAIEmbeddingProvider(BaseEmbeddingProvider):
     Uses OpenAI's embedding models to generate text embeddings.
     """
 
-    def __init__(self, model: str, base_url: str | None = None) -> None:
+    def __init__(self, model: str, api_key: str | None = None, base_url: str | None = None) -> None:
         """Initialize the OpenAI embedding provider.
 
         Args:
             model: The OpenAI embedding model name (e.g., 'text-embedding-3-small').
-            base_url: Explicit base URL for the OpenAI API. If not provided,
-                defaults to the standard OpenAI API, explicitly ignoring any
-                OPENAI_BASE_URL env var (which may point to a chat-only local
-                server that doesn't support embeddings).
+            api_key: API key for the embedding endpoint. If not provided, falls
+                back to ``EMBEDDING_API_KEY``, then ``LLM_API_KEY`` from settings,
+                or ``"no-key-required"``.
+            base_url: Explicit base URL for the embedding API. If not provided,
+                falls back to ``EMBEDDING_BASE_URL``, then ``LLM_BASE_URL`` from
+                settings. As a last resort defaults to the standard OpenAI API.
         """
+        from backend.core.config import settings as app_settings
+
         self.model = model
-        # Explicitly pass base_url to avoid picking up OPENAI_BASE_URL from env
-        self.client = OpenAI(base_url=base_url or "https://api.openai.com/v1")
+        resolved_key = (
+            api_key
+            or app_settings.embedding_api_key
+            or app_settings.llm_api_key
+            or "no-key-required"
+        )
+        resolved_url = (
+            base_url
+            or app_settings.embedding_base_url
+            or app_settings.llm_base_url
+            or "https://api.openai.com/v1"
+        )
+        self.client = OpenAI(base_url=resolved_url, api_key=resolved_key)
 
     def embed_queries(self, texts: list[str]) -> list[list[float]]:
         """Embed a list of query texts using OpenAI.
@@ -104,15 +119,20 @@ class EmbeddingService:
     Supports multiple backends: OpenAI, Voyage AI, and Sentence Transformers.
     """
 
-    def __init__(self, settings: RAGSettings):
+    def __init__(self, settings: RAGSettings, api_key: str | None = None):
         """Initialize the embedding service.
 
         Args:
             settings: RAG configuration settings.
+            api_key: Optional API key for the embedding endpoint. If not provided,
+                falls back to the application LLM API key.
         """
+        if api_key is None:
+            from backend.core.config import settings as app_settings
+            api_key = app_settings.llm_api_key
         config = settings.embeddings_config
         self.expected_dim = config.dim
-        self.provider = OpenAIEmbeddingProvider(model=config.model)
+        self.provider = OpenAIEmbeddingProvider(model=config.model, api_key=api_key)
 
     def embed_query(self, query: str) -> list[float]:
         """Embed a single query text.

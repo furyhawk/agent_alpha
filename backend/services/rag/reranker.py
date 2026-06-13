@@ -59,9 +59,6 @@ class BaseReranker(ABC):
         pass
 
 
-from sentence_transformers import CrossEncoder
-
-
 class CrossEncoderReranker(BaseReranker):
     """Cross Encoder reranker using local Sentence Transformers model.
 
@@ -87,9 +84,11 @@ class CrossEncoderReranker(BaseReranker):
         self._model = None
 
     @property
-    def model(self) -> CrossEncoder:
+    def model(self) -> object:
         """Lazy load the cross-encoder model."""
         if self._model is None:
+            from sentence_transformers import CrossEncoder
+
             from backend.core.config import settings as app_settings
 
             cache_path = self.cache_dir or str(app_settings.models_cache_dir)

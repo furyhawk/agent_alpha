@@ -33,6 +33,10 @@ services:
       - MILVUS_TOKEN=${MILVUS_TOKEN:-}
       - MEDIA_DIR=${MEDIA_DIR:-/app/media}
       - MAX_UPLOAD_SIZE_MB=${MAX_UPLOAD_SIZE_MB:-50}
+      # Embeddings — defaults to LLM_BASE_URL; set to a server that supports
+      # the OpenAI-compatible embeddings endpoint (e.g. Ollama, OpenAI).
+      - EMBEDDING_BASE_URL=${EMBEDDING_BASE_URL:-}
+      - EMBEDDING_API_KEY=${EMBEDDING_API_KEY:-}
 
     restart: unless-stopped
     depends_on:
@@ -41,7 +45,7 @@ services:
       valkey:
         condition: service_healthy
       milvus:
-        condition: service_healthy
+        condition: service_started
     # Uncomment to use a local .env file instead of env vars:
     # env_file:
     #   - .env
@@ -64,7 +68,7 @@ services:
 
   # ── PostgreSQL ──────────────────────────────────────────────────
   postgres:
-    image: postgres:16-alpine
+    image: docker.io/postgres:16-alpine
     container_name: agent-alpha-postgres
     ports:
       - "5432:5432"
@@ -83,7 +87,7 @@ services:
 
   # ── Valkey (Redis-compatible) ──────────────────────────────────
   valkey:
-    image: valkey/valkey:8-alpine
+    image: docker.io/valkey/valkey:8-alpine
     container_name: agent-alpha-valkey
     ports:
       - "6379:6379"
@@ -96,71 +100,54 @@ services:
       retries: 10
     restart: unless-stopped
 
-  # ── Milvus Vector Database ──────────────────────────────────────
-  # Requires etcd (coordinator) and MinIO (storage).
+  # ── Milvus Vector Database (standalone — bundles etcd + MinIO) ──
   milvus:
-    image: milvusdb/milvus:v2.5-latest
+    image: docker.io/milvusdb/milvus:v2.4.1
     container_name: agent-alpha-milvus
     ports:
       - "19530:19530"
     environment:
       ETCD_ENDPOINTS: etcd:2379
       MINIO_ADDRESS: minio:9000
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
     volumes:
       - milvus_data:/var/lib/milvus
+    command: milvus run standalone
     depends_on:
-      etcd:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9091/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
+      - etcd
+      - minio
     restart: unless-stopped
 
   etcd:
-    image: quay.io/coreos/etcd:v3.5.17
+    image: quay.io/coreos/etcd:v3.5.4
     container_name: agent-alpha-etcd
     environment:
       ETCD_AUTO_COMPACTION_MODE: revision
       ETCD_AUTO_COMPACTION_RETENTION: "1000"
       ETCD_QUOTA_BACKEND_BYTES: "4294967296"
       ETCD_SNAPSHOT_COUNT: "50000"
+      ETCD_LISTEN_CLIENT_URLS: "http://0.0.0.0:2379"
+      ETCD_ADVERTISE_CLIENT_URLS: "http://0.0.0.0:2379"
     volumes:
       - etcd_data:/etcd
-    healthcheck:
-      test: ["CMD", "etcdctl", "endpoint", "health"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
     restart: unless-stopped
 
   minio:
-    image: minio/minio:RELEASE.2024-11-17T22-20-09Z
+    image: docker.io/minio/minio:latest
     container_name: agent-alpha-minio
     ports:
       - "9000:9000"
       - "9001:9001"
     environment:
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
     volumes:
       - minio_data:/data
     command: server /data --console-address ":9001"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
     restart: unless-stopped
 
   # ── Ollama (optional — uncomment to run the LLM locally) ────────
   # ollama:
-  #   image: ollama/ollama:latest
+  #   image: docker.io/ollama/ollama:latest
   #   container_name: ollama
   #   ports:
   #     - "11434:11434"

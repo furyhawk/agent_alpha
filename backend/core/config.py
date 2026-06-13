@@ -59,6 +59,14 @@ class Settings(BaseSettings):
     hf_token: str = ""
     models_cache_dir: Path = Path.home() / ".cache" / "agent-alpha" / "models"
 
+    # ── Embeddings ─────────────────────────────────────────────────────────
+
+    embedding_base_url: str = ""
+    """Base URL for the embedding API. If empty, uses the LLM base URL."""
+
+    embedding_api_key: str = ""
+    """API key for the embedding API. If empty, uses the LLM API key."""
+
     # ── AI Configuration ───────────────────────────────────────────────────
 
     ai_model: str = "gpt-4o"
