@@ -5,7 +5,7 @@ from __future__ import annotations
 import logfire
 from pydantic_ai import Agent
 from pydantic_ai.capabilities import MCP, Thinking, ToolSearch, WebSearch
-from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.models.openai import OpenAIResponsesModel
 from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai_harness import CodeMode
 
@@ -32,7 +32,7 @@ class AgentService:
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
         self._agent: Agent | None = None
-        self._model: OpenAIModel | None = None
+        self._model: OpenAIResponsesModel | None = None
 
     # ── Lifecycle ──────────────────────────────────────────────────────────
 
@@ -48,7 +48,7 @@ class AgentService:
             except Exception:
                 pass  # Logfire is optional — don't crash if it fails
 
-        self._model = OpenAIModel(
+        self._model = OpenAIResponsesModel(
             self._settings.llm_model,
             provider=OpenAIProvider(
                 base_url=self._settings.llm_base_url,

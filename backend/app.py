@@ -21,16 +21,32 @@ from backend.routes.users import router as users_router
 logger = logging.getLogger("agent_alpha")
 
 
-def _configure_logging() -> None:
+def _configure_logging(*, debug: bool = False) -> None:
     """Configure standard logging to match FastAPI/uvicorn's log format."""
     handler = logging.StreamHandler()
     handler.setFormatter(DefaultFormatter("%(levelprefix)s %(message)s"))
-    logging.getLogger("agent_alpha").addHandler(handler)
-    logging.getLogger("agent_alpha").setLevel(logging.INFO)
-    logging.getLogger("agent_alpha").propagate = False
+    logger = logging.getLogger("agent_alpha")
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG if debug else logging.INFO)
+    logger.propagate = False
 
 
 _configure_logging()
+
+
+def _reconfigure_logging(*, debug: bool) -> None:
+    """Adjust all agent_alpha loggers to the requested level.
+
+    Called at startup so the ``debug`` setting from ``.env`` is reflected
+    even though the module-level logger was configured at import time.
+    """
+    level = logging.DEBUG if debug else logging.INFO
+    for name in ("agent_alpha", "backend", "backend.core", "backend.routes"):
+        logging.getLogger(name).setLevel(level)
+    # Also enable debug for uvicorn when debug mode is on.
+    if debug:
+        logging.getLogger("uvicorn.access").setLevel(logging.DEBUG)
+        logging.getLogger("uvicorn.error").setLevel(logging.DEBUG)
 
 
 class AppBuilder:
@@ -78,6 +94,9 @@ class AppBuilder:
     @asynccontextmanager
     async def _lifespan(self, _app: FastAPI):
         """Startup / shutdown lifecycle."""
+        # Apply debug log level from settings (may override module-level default).
+        _reconfigure_logging(debug=self._settings.debug)
+
         logger.info("Agent Alpha backend starting")
 
         # Create database tables if they don't exist.
