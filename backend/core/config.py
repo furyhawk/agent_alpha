@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,6 +32,58 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+asyncpg://agent_alpha:agent_alpha@localhost:5432/agent_alpha"
     valkey_url: str = "redis://localhost:6379/0"
+
+    # ── Milvus (Vector Database) ───────────────────────────────────────────
+
+    milvus_uri: str = "http://localhost:19530"
+    milvus_token: str = ""
+
+    # ── Redis pub/sub (for RAG status SSE) ─────────────────────────────────
+
+    redis_host: str = "localhost"
+    redis_port: int = 6379
+    redis_db: int = 0
+
+    # ── Media & File Storage ───────────────────────────────────────────────
+
+    media_dir: str = "media"
+    max_upload_size_mb: int = 50
+
+    # ── RAG Parsing ────────────────────────────────────────────────────────
+
+    pdf_parser: str = "pymupdf"
+
+    # ── Cross-Encoder Reranker ─────────────────────────────────────────────
+
+    cross_encoder_model: str = "cross-encoder/ms-marco-MiniLM-L6-v2"
+    hf_token: str = ""
+    models_cache_dir: Path = Path.home() / ".cache" / "agent-alpha" / "models"
+
+    # ── AI Configuration ───────────────────────────────────────────────────
+
+    ai_model: str = "gpt-4o"
+    rag_image_description_model: str = ""
+
+    # ── RAG Settings (derived) ────────────────────────────────────────────
+
+    @property
+    def rag(self) -> object:
+        """Return a ``RAGSettings`` instance configured from application settings.
+
+        Lazy import to avoid circular dependencies at module level.
+        """
+        from backend.services.rag.config import RAGSettings
+
+        return RAGSettings(
+            collection_name="documents",
+            chunk_size=512,
+            chunk_overlap=50,
+            chunking_strategy="recursive",
+            enable_hybrid_search=False,
+            enable_ocr=False,
+            enable_image_description=True,
+            image_description_model=self.rag_image_description_model,
+        )
 
     # ── Factories ──────────────────────────────────────────────────────────
 

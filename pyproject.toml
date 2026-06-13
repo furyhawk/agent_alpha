@@ -20,4 +20,16 @@ dependencies = [
     "bcrypt>=4.2.0",
     "redis[hiredis]>=5.2.0",
     "sqlalchemy[asyncio]>=2.0.36",
+    "pymupdf>=1.27.2.3",
+    "python-docx>=1.2.0",
+    "langchain-text-splitters>=1.1.2",
+    "sentence-transformers>=5.5.1",
+    # Vector Database
+    "pymilvus>=2.5.0",
+    # Async Task Queue (lightweight, redis-based)
+    # (using redis directly instead of arq to avoid dep conflicts)
+    # Embeddings
+    "openai>=1.0.0",
+    # Hybrid Search
+    "rank-bm25>=0.2.2",
 ]

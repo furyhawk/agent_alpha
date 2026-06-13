@@ -16,6 +16,7 @@ from backend.routes.admin import router as admin_router
 from backend.routes.auth import router as auth_router
 from backend.routes.chat import router as chat_router
 from backend.routes.health import router as health_router
+from backend.routes.rag import router as rag_router
 from backend.routes.users import router as users_router
 
 logger = logging.getLogger("agent_alpha")
@@ -86,6 +87,7 @@ class AppBuilder:
         app.include_router(health_router)
         app.include_router(chat_router)
         app.include_router(users_router)
+        app.include_router(rag_router)
 
         return app
 

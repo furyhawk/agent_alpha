@@ -45,6 +45,8 @@ from sqlalchemy.ext.asyncio import (
 
 from backend.core.config import settings
 from backend.core.models import Base, User
+# Import RAG models so they are registered with Base.metadata for create_all
+from backend.db.models import RAGDocument, SyncLog, SyncSource, ChatFile  # noqa: F401
 
 # ── PostgreSQL (SQLAlchemy async) ──────────────────────────────────────────
 
