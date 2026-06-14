@@ -42,7 +42,7 @@ services:
       - MAX_UPLOAD_SIZE_MB=${MAX_UPLOAD_SIZE_MB:-50}
       # Embeddings — defaults to LLM_BASE_URL; set to a server that supports
       # the OpenAI-compatible embeddings endpoint (e.g. Ollama, OpenAI).
-      - EMBEDDING_BASE_URL=${EMBEDDING_BASE_URL:-}
+      - EMBEDDING_BASE_URL=${EMBEDDING_BASE_URL:-http://host.containers.internal:8011/v1}
       - EMBEDDING_API_KEY=${EMBEDDING_API_KEY:-}
 
     restart: unless-stopped

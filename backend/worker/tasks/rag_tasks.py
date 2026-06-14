@@ -86,6 +86,7 @@ async def ingest_document_task(
                     doc_id=rag_document_id,
                     error_message=result.error_message or "Unknown error",
                 )
+            await session.commit()
 
         logger.info(
             "[WORKER] Ingestion complete: doc=%s, status=%s",
@@ -104,6 +105,7 @@ async def ingest_document_task(
                 doc_id=rag_document_id,
                 error_message=str(exc),
             )
+            await session.commit()
         return {"status": "error", "message": str(exc)}
 
 

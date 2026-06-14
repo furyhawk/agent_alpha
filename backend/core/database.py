@@ -99,6 +99,7 @@ def open_session() -> AsyncSession:
 
         async with open_session() as session:
             await session.execute(...)
+            await session.commit()  # required — no auto-commit
 
     The session is automatically closed on exit of the ``async with`` block.
     """

@@ -98,14 +98,18 @@ EMBEDDING_DIMENSIONS: dict[str, int] = {
     "bge-small-en-v1.5": 384,
     "bge-base-en-v1.5": 768,
     "bge-large-en-v1.5": 1024,
+    # llama.cpp / local models (Gemma, Llama, etc.)
+    "gemma-4-12b-it": 3840,
+    "gemma-4-12b": 3840,
+    "unsloth/gemma-4-12B-it-qat-GGUF:UD-Q4_K_XL": 3840,
 }
 
 
 class EmbeddingsConfig(BaseModel):
     """Embeddings configuration. Dimension is auto-derived from model name."""
 
-    model: str = "text-embedding-3-small"
-    dim: int = 1536
+    model: str = "unsloth/gemma-4-12B-it-qat-GGUF:UD-Q4_K_XL"
+    dim: int = 3840
 
     @model_validator(mode="after")
     def set_dim_from_model(self) -> "EmbeddingsConfig":
