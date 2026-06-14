@@ -1,4 +1,4 @@
-# Agent Alpha 🤖
+# Agent Alpha 🤖α
 
 An agentic AI application built with **pydantic-ai**, featuring a FastAPI backend and a React + Vite frontend.
 
