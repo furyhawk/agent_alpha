@@ -438,6 +438,12 @@ class DocumentProcessor:
             document = await self.pdf_parser.parse(filepath)
         else:
             raise ValueError(f"Unsupported file type: {filepath.suffix}")
+        logger.info(
+            "[DOCPROC] Parsed '%s': %d pages, %d images",
+            filepath.name,
+            len(document.pages),
+            sum(len(p.images) for p in document.pages),
+        )
         # Describe images using LLM vision before chunking
         await self._describe_images(document)
 
@@ -464,4 +470,12 @@ class DocumentProcessor:
 
         # Add chunked pages to original document
         document.chunked_pages = chunked_pages
+        logger.info(
+            "[DOCPROC] Chunked '%s': %d chunks (strategy=%s, size=%d, overlap=%d)",
+            filepath.name,
+            len(chunked_pages),
+            self.settings.chunking_strategy,
+            self.settings.chunk_size,
+            self.settings.chunk_overlap,
+        )
         return document

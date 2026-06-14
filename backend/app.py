@@ -24,12 +24,18 @@ logger = logging.getLogger("agent_alpha")
 
 def _configure_logging(*, debug: bool = False) -> None:
     """Configure standard logging to match FastAPI/uvicorn's log format."""
+    level = logging.DEBUG if debug else logging.INFO
     handler = logging.StreamHandler()
     handler.setFormatter(DefaultFormatter("%(levelprefix)s %(message)s"))
+    # Configure the agent_alpha logger
     logger = logging.getLogger("agent_alpha")
     logger.addHandler(handler)
-    logger.setLevel(logging.DEBUG if debug else logging.INFO)
+    logger.setLevel(level)
     logger.propagate = False
+    # Ensure all backend.* loggers output to stderr at the right level
+    logging.getLogger("backend").addHandler(handler)
+    logging.getLogger("backend").setLevel(level)
+    logging.getLogger("backend").propagate = False
 
 
 _configure_logging()

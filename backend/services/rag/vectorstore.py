@@ -180,6 +180,13 @@ class MilvusVectorStore(BaseVectorStore):
         await self._ensure_collection(collection_name)
         if not document.chunked_pages:
             raise ValueError("Document has no chunked pages.")
+        logger.info(
+            "[MILVUS] Inserting doc '%s' into collection '%s': %d chunks, dim=%d",
+            document.metadata.filename,
+            collection_name,
+            len(document.chunked_pages),
+            self.settings.embeddings_config.dim,
+        )
         vectors = self.embedder.embed_document(document)
         data = [
             {
@@ -191,7 +198,11 @@ class MilvusVectorStore(BaseVectorStore):
             }
             for i, chunk in enumerate(document.chunked_pages)
         ]
-        await self.client.insert(collection_name, data=data)
+        insert_result = await self.client.insert(collection_name, data=data)
+        logger.info(
+            "[MILVUS] Insert result: %s",
+            insert_result,
+        )
 
     async def search(
         self, collection_name: str, query: str, limit: int = 4, filter: str = ""

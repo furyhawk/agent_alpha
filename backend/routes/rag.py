@@ -257,7 +257,10 @@ async def delete_document(
 ) -> RAGMessageResponse:
     """Delete a document from tracking and cascade to vector store + file storage."""
     service = RAGDocumentService(db=session)
-    ingestion = _get_ingestion_service()
+    try:
+        ingestion = _get_ingestion_service()
+    except Exception:
+        ingestion = None
     await service.delete_document(doc_id, ingestion_service=ingestion)
     return RAGMessageResponse(message=f"Document '{doc_id}' deleted")
 

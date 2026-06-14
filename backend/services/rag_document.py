@@ -113,6 +113,13 @@ class RAGDocumentService:
         allowed = get_supported_formats(getattr(settings, "pdf_parser", "pymupdf"))
         max_size = settings.max_upload_size_mb * 1024 * 1024
 
+        logger.info(
+            "[RAGDOC] dispatch_upload: filename='%s', size=%d, collection='%s', replace=%s",
+            filename,
+            len(file_data),
+            collection_name,
+            replace,
+        )
         ext = Path(filename).suffix.lower()
         if ext not in allowed:
             raise BadRequestError(
@@ -135,9 +142,11 @@ class RAGDocumentService:
             storage_path=storage_path,
         )
         doc_id = rag_doc.id
+        logger.info("[RAGDOC] Saved file to '%s', doc_id=%s", storage_path, doc_id)
 
         # Ensure the target collection exists before the worker starts
         await vector_store.create_collection(collection_name)
+        logger.info("[RAGDOC] Ensured collection '%s' exists", collection_name)
 
         # Stage the upload in the volume shared with the worker container
         tmp_dir = os.path.join(str(settings.media_dir), "_rag_tmp")

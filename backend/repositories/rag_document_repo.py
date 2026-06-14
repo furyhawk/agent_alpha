@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete as sa_delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db.models.rag_document import RAGDocument
@@ -69,7 +69,7 @@ async def update_status(
 
 async def delete(session: AsyncSession, doc_id: UUID) -> None:
     """Delete a RAG document record."""
-    stmt = delete(RAGDocument).where(RAGDocument.id == doc_id)
+    stmt = sa_delete(RAGDocument).where(RAGDocument.id == doc_id)
     await session.execute(stmt)
     await session.flush()
 
@@ -77,7 +77,7 @@ async def delete(session: AsyncSession, doc_id: UUID) -> None:
 async def delete_by_collection(session: AsyncSession, collection_name: str) -> int:
     """Delete all RAG documents for a collection. Returns count."""
     stmt = (
-        delete(RAGDocument)
+        sa_delete(RAGDocument)
         .where(RAGDocument.collection_name == collection_name)
         .returning(RAGDocument.id)
     )

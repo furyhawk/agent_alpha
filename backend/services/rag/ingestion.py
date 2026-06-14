@@ -100,6 +100,13 @@ class IngestionService:
             source_path: Override source path (e.g., gdrive://id, s3://bucket/key).
         """
         try:
+            logger.info(
+                "[INGEST] Starting ingestion: file='%s', collection='%s', replace=%s, source='%s'",
+                filepath.name,
+                collection_name,
+                replace,
+                source_path or filepath.name,
+            )
             # Processing (Parsing + Chunking)
             document: Document = await self.processor.process_file(filepath)
 
@@ -127,6 +134,12 @@ class IngestionService:
                 await self.store.delete_document(collection_name, existing_id)
                 logger.info(f"Replaced existing document {existing_id} for '{filepath.name}'")
 
+            logger.info(
+                "[INGEST] Inserting into vector store: collection='%s', doc_id=%s, chunks=%d",
+                collection_name,
+                document.id,
+                len(document.chunked_pages or []),
+            )
             # Storage (Embedding + Insertion)
             await self.store.insert_document(
                 collection_name=collection_name,
@@ -147,6 +160,12 @@ class IngestionService:
                 },
             )
 
+            logger.info(
+                "[INGEST] Success: action=%s, doc_id=%s, chunks=%d",
+                action,
+                document.id,
+                len(document.chunked_pages or []),
+            )
             return IngestionResult(
                 status=IngestionStatus.DONE,
                 document_id=document.id,
@@ -154,7 +173,7 @@ class IngestionService:
             )
 
         except Exception as e:
-            logger.error(f"Ingestion error for {filepath.name}: {e!s}")
+            logger.error(f"[INGEST] Error for {filepath.name}: {e!s}")
             return IngestionResult(
                 status=IngestionStatus.ERROR,
                 error_message=str(e),

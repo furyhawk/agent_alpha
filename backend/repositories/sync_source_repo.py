@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete as sa_delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db.models.sync_source import SyncSource
@@ -71,7 +71,7 @@ async def update(
 
 async def delete(session: AsyncSession, source_id: UUID) -> None:
     """Delete a sync source."""
-    stmt = delete(SyncSource).where(SyncSource.id == source_id)
+    stmt = sa_delete(SyncSource).where(SyncSource.id == source_id)
     await session.execute(stmt)
     await session.flush()
 

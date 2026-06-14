@@ -1,3 +1,5 @@
+import logging
+
 from abc import ABC, abstractmethod
 
 from openai import OpenAI
@@ -101,7 +103,19 @@ class OpenAIEmbeddingProvider(BaseEmbeddingProvider):
         texts = [
             doc.chunk_content if doc.chunk_content else "" for doc in (document.chunked_pages or [])
         ]
-        return self.embed_queries(texts)
+        logging.getLogger(__name__).info(
+            "[EMBED] Embedding %d chunks for doc '%s' (model=%s)",
+            len(texts),
+            document.metadata.filename,
+            self.model,
+        )
+        vectors = self.embed_queries(texts)
+        logging.getLogger(__name__).info(
+            "[EMBED] Got %d vectors, first vector len=%d",
+            len(vectors),
+            len(vectors[0]) if vectors else 0,
+        )
+        return vectors
 
     def warmup(self) -> None:
         """Warmup method for OpenAI client.
@@ -160,6 +174,13 @@ class EmbeddingService:
         Returns:
             List of embedding vectors for each chunk.
         """
+        chunk_count = len(document.chunked_pages or [])
+        logging.getLogger(__name__).info(
+            "[EMBEDSVC] Embedding doc '%s': %d chunks, expected_dim=%d",
+            document.metadata.filename,
+            chunk_count,
+            self.expected_dim,
+        )
         results = self.provider.embed_document(document)
         if results and len(results[0]) != self.expected_dim:
             raise ValueError(
