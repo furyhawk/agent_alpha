@@ -322,3 +322,220 @@ export async function adminDeleteSession(sessionId: string): Promise<void> {
     throw new Error(body?.detail ?? `HTTP ${res.status}`);
   }
 }
+
+/* ── RAG API ─────────────────────────────────────────────────────── */
+
+export interface RAGCollectionInfo {
+  name: string;
+  total_vectors: number;
+  dim: number;
+  indexing_status: string;
+}
+
+export interface RAGCollectionList {
+  items: string[];
+}
+
+export interface RAGSearchResult {
+  content: string;
+  score: number;
+  metadata: Record<string, unknown>;
+  parent_doc_id: string;
+}
+
+export interface RAGSearchResponse {
+  results: RAGSearchResult[];
+}
+
+export interface RAGTrackedDocument {
+  id: string;
+  collection_name: string;
+  filename: string;
+  filesize: number;
+  filetype: string;
+  status: string;
+  error_message: string | null;
+  vector_document_id: string | null;
+  chunk_count: number;
+  has_file: boolean;
+  created_at: string | null;
+  completed_at: string | null;
+}
+
+export interface RAGTrackedDocumentList {
+  items: RAGTrackedDocument[];
+  total: number;
+}
+
+export interface RAGIngestResponse {
+  id: string;
+  status: string;
+  filename: string;
+  collection: string;
+  message: string;
+}
+
+export interface RAGSyncLog {
+  id: string;
+  source: string;
+  collection_name: string;
+  status: string;
+  mode: string;
+  total_files: number;
+  ingested: number;
+  updated: number;
+  skipped: number;
+  failed: number;
+  error_message: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+export interface RAGSyncLogList {
+  items: RAGSyncLog[];
+  total: number;
+}
+
+export interface RAGMessageResponse {
+  message: string;
+}
+
+/** List Milvus collections. */
+export async function listRagCollections(): Promise<string[]> {
+  const res = await fetch(`${API_BASE}/rag/collections`, {
+    headers: { ...authHeaders() },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? `HTTP ${res.status}`);
+  }
+  const data: RAGCollectionList = await res.json();
+  return data.items;
+}
+
+/** Get collection info. */
+export async function getRagCollectionInfo(
+  name: string,
+): Promise<RAGCollectionInfo> {
+  const res = await fetch(`${API_BASE}/rag/collections/${encodeURIComponent(name)}`, {
+    headers: { ...authHeaders() },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+/** Delete a collection. */
+export async function deleteRagCollection(name: string): Promise<string> {
+  const res = await fetch(`${API_BASE}/rag/collections/${encodeURIComponent(name)}`, {
+    method: "DELETE",
+    headers: { ...authHeaders() },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? `HTTP ${res.status}`);
+  }
+  const data: RAGMessageResponse = await res.json();
+  return data.message;
+}
+
+/** List tracked documents. */
+export async function listRagDocuments(
+  collectionName?: string,
+): Promise<RAGTrackedDocumentList> {
+  const params = collectionName ? `?collection_name=${encodeURIComponent(collectionName)}` : "";
+  const res = await fetch(`${API_BASE}/rag/documents${params}`, {
+    headers: { ...authHeaders() },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+/** Delete a tracked document. */
+export async function deleteRagDocument(docId: string): Promise<string> {
+  const res = await fetch(`${API_BASE}/rag/documents/${docId}`, {
+    method: "DELETE",
+    headers: { ...authHeaders() },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? `HTTP ${res.status}`);
+  }
+  const data: RAGMessageResponse = await res.json();
+  return data.message;
+}
+
+/** Retry ingestion for a failed document. */
+export async function retryRagDocument(docId: string): Promise<{ id: string; status: string; message: string }> {
+  const res = await fetch(`${API_BASE}/rag/documents/${docId}/retry`, {
+    method: "POST",
+    headers: { ...authHeaders() },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+/** Upload a file for RAG ingestion. */
+export async function uploadRagDocument(
+  file: File,
+  collectionName = "documents",
+  replace = true,
+): Promise<RAGIngestResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const url = `${API_BASE}/rag/upload/${encodeURIComponent(collectionName)}?replace=${replace}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { ...authHeaders() }, // no Content-Type for FormData
+    body: formData,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+/** List sync logs. */
+export async function listRagSyncLogs(
+  collectionName?: string,
+  limit = 20,
+): Promise<RAGSyncLogList> {
+  const params = new URLSearchParams();
+  if (collectionName) params.set("collection_name", collectionName);
+  params.set("limit", String(limit));
+  const res = await fetch(`${API_BASE}/rag/sync-logs?${params}`, {
+    headers: { ...authHeaders() },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+/** Search across RAG collections. */
+export async function searchRag(
+  query: string,
+  collectionName = "documents",
+  limit = 5,
+): Promise<RAGSearchResponse> {
+  const res = await fetch(`${API_BASE}/rag/search`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ query, collection_name: collectionName, limit }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+}

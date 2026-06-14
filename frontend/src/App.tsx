@@ -14,6 +14,7 @@ import {
   type UserSessionData,
 } from "./api";
 import AdminDashboard from "./Admin";
+import RagDashboard from "./RagDashboard";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -226,6 +227,7 @@ export default function App() {
 
   /* ── Admin state ──────────────────────────────────────────────────── */
   const [showAdmin, setShowAdmin] = useState(false);
+  const [showRag, setShowRag] = useState(false);
 
   /* ── Session sidebar state ───────────────────────────────────────── */
   const [userSessions, setUserSessions] = useState<UserSessionData[]>([]);
@@ -419,7 +421,11 @@ export default function App() {
   /* ── Admin UI ────────────────────────────────────────────────────── */
 
   if (showAdmin && authenticated.role === "admin") {
-    return <AdminDashboard onBack={() => setShowAdmin(false)} />;
+    return <AdminDashboard onBack={() => { setShowAdmin(false); setShowRag(false); }} />;
+  }
+
+  if (showRag && authenticated.role === "admin") {
+    return <RagDashboard onBack={() => { setShowRag(false); setShowAdmin(false); }} />;
   }
 
   /* ── Chat UI ─────────────────────────────────────────────────────── */
@@ -472,16 +478,29 @@ export default function App() {
 
         {/* Admin button — only for admin role */}
         {authenticated.role === "admin" && (
-          <button
-            onClick={() => setShowAdmin(true)}
-            className="rounded-lg border border-gray-700 px-3 py-1.5 text-sm text-purple-400 transition hover:border-purple-500 hover:text-purple-300"
-            title="Admin dashboard"
-          >
-            <svg className="mr-1 inline-block h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-            Admin
-          </button>
+          <>
+            <button
+              onClick={() => setShowAdmin(true)}
+              className="rounded-lg border border-gray-700 px-3 py-1.5 text-sm text-purple-400 transition hover:border-purple-500 hover:text-purple-300"
+              title="Admin dashboard"
+            >
+              <svg className="mr-1 inline-block h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              Admin
+            </button>
+            <button
+              onClick={() => setShowRag(true)}
+              className="rounded-lg border border-gray-700 px-3 py-1.5 text-sm text-emerald-400 transition hover:border-emerald-500 hover:text-emerald-300"
+              title="RAG Dashboard"
+            >
+              <svg className="mr-1 inline-block h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9a2 2 0 00-1-1.73l-5-3a2 2 0 00-2 0l-5 3A2 2 0 005 9v10a2 2 0 002 2z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 17v-5m0 0l-2-2m2 2l2-2" />
+              </svg>
+              RAG
+            </button>
+          </>
         )}
 
         {/* Logout button */}
