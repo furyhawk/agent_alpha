@@ -203,6 +203,9 @@ class MilvusVectorStore(BaseVectorStore):
             "[MILVUS] Insert result: %s",
             insert_result,
         )
+        # Flush to ensure data is persisted to object storage (MinIO) immediately
+        await self.client.flush(collection_name)
+        logger.info("[MILVUS] Flushed collection '%s' to disk", collection_name)
 
     async def search(
         self, collection_name: str, query: str, limit: int = 4, filter: str = ""

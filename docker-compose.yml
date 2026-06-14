@@ -116,6 +116,12 @@ services:
     environment:
       ETCD_ENDPOINTS: etcd:2379
       MINIO_ADDRESS: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET_NAME: agent-alpha
+      # Data persistence tuning — flush segments to S3/MinIO every 3s
+      dataCoord_segment_dmlogFileTimeout: "3"
+      dataCoord_segment_flushInterval: "3"
     volumes:
       - milvus_data:/var/lib/milvus
     command: milvus run standalone
@@ -134,6 +140,7 @@ services:
       ETCD_SNAPSHOT_COUNT: "50000"
       ETCD_LISTEN_CLIENT_URLS: "http://0.0.0.0:2379"
       ETCD_ADVERTISE_CLIENT_URLS: "http://0.0.0.0:2379"
+      ETCD_DATA_DIR: /etcd
     volumes:
       - etcd_data:/etcd
     restart: unless-stopped
