@@ -365,6 +365,7 @@ _MESSAGES_KEY = "chat:{session_id}:messages"
 _SESSIONS_SET = "chat:sessions"
 _SESSION_USER_KEY = "chat:{session_id}:user_id"
 _SESSION_TITLE_KEY = "chat:{session_id}:title"
+_SESSION_CREATED_KEY = "chat:{session_id}:created_at"
 _USER_SESSIONS_KEY = "user:{user_id}:sessions"
 
 
@@ -382,15 +383,19 @@ async def save_message(
     if valkey is None:
         valkey = await get_valkey()
 
+    now = datetime.now(timezone.utc)
     msg = {
         "role": role,
         "content": content,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": now.isoformat(),
     }
     key = _MESSAGES_KEY.format(session_id=session_id)
+    created_key = _SESSION_CREATED_KEY.format(session_id=session_id)
     async with valkey.pipeline(transaction=True) as pipe:
         pipe.rpush(key, json.dumps(msg))
         pipe.sadd(_SESSIONS_SET, session_id)
+        # Set created_at only for the first message (NX = set if not exists)
+        pipe.setnx(created_key, now.isoformat())
         if user_id is not None:
             pipe.set(
                 _SESSION_USER_KEY.format(session_id=session_id),
@@ -457,6 +462,18 @@ async def get_session_title(
     return await valkey.get(key)
 
 
+async def get_session_created_at(
+    session_id: str,
+    valkey: Redis | None = None,
+) -> str | None:
+    """Return the ISO-8601 creation timestamp for a session, or ``None``."""
+    if valkey is None:
+        valkey = await get_valkey()
+
+    key = _SESSION_CREATED_KEY.format(session_id=session_id)
+    return await valkey.get(key)
+
+
 async def list_sessions(
     valkey: Redis | None = None,
 ) -> list[str]:
@@ -496,10 +513,12 @@ async def delete_session(
     key = _MESSAGES_KEY.format(session_id=session_id)
     session_user_key = _SESSION_USER_KEY.format(session_id=session_id)
     session_title_key = _SESSION_TITLE_KEY.format(session_id=session_id)
+    session_created_key = _SESSION_CREATED_KEY.format(session_id=session_id)
     async with valkey.pipeline(transaction=True) as pipe:
         pipe.delete(key)
         pipe.delete(session_user_key)
         pipe.delete(session_title_key)
+        pipe.delete(session_created_key)
         pipe.srem(_SESSIONS_SET, session_id)
         if user_sessions_key is not None:
             pipe.srem(user_sessions_key, session_id)

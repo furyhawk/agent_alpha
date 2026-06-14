@@ -80,6 +80,8 @@ export interface UserCreateData {
 export interface UserSessionData {
   session_id: string;
   title: string | null;
+  created_at: string | null;
+  message_count: number;
 }
 
 /* ── Auth API ──────────────────────────────────────────────────── */

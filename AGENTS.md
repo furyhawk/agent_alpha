@@ -12,7 +12,7 @@ agent_alpha/
 │   ├── core/
 │   │   ├── agent.py   # AgentService (lazy init, capabilities)
 │   │   ├── config.py  # pydantic-settings from .env
-│   │   ├── database.py# SQLAlchemy async engine + Valkey client + migrations
+│   │   ├── database.py# SQLAlchemy async engine + Valkey client + migrations; session created_at tracking
 │   │   ├── dependencies.py  # FastAPI DI providers
 │   │   └── models.py  # SQLAlchemy ORM models (User)
 │   └── routes/
@@ -78,6 +78,7 @@ make compose-down       # Stop everything
 - **Interfaces** at file top, exported when reused.
 - **Tailwind utility classes** inline; no CSS modules or styled-components.
 - **API client** isolated in `api.ts` — exports for chat (`sendMessage`, `getHistory`), auth (`login`, `register`, `getMe`, `logout`), users (`listUsers`, `createUser`, `getUserSessions`), and admin (`getAdminStats`, `adminListUsers`, `adminUpdateUser`, `adminListSessions`, `adminDeleteSession`). Auth token managed via `localStorage` + `Authorization: Bearer` header helpers.
+- **Session metadata**: Session creation timestamps (`chat:{session_id}:created_at`) are stored in Valkey via `SETNX` on the first message. The `GET /api/users/{user_id}/sessions` endpoint returns `session_id`, `title`, `created_at` (ISO-8601), and `message_count`, sorted newest-first. The frontend displays relative time via `formatSessionTime()` in the sessions sidebar.
 
 ## Key Architecture Decisions
 
@@ -104,3 +105,12 @@ Environment variables loaded from `.env` via `pydantic-settings` (`backend/core/
 7. **Container orchestration**: Backend depends on postgres + valkey being healthy. Use `depends_on` with `condition: service_healthy`. Run with `docker compose up -d` or `podman compose up -d`. The Makefile auto-detects the available runtime.
 8. **Schema migrations**: `init_db()` in `database.py` runs `Base.metadata.create_all` followed by `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` for new columns. Existing tables are never rebuilt — new columns are added in-place.
 9. **bcrypt on container restart**: `bcrypt` is a native dependency. If the container fails to start with an import error, ensure `bcrypt` is in `pyproject.toml` and `uv sync` was run during the container build.
+
+## Key Conventions
+
+- `db.flush()` in repositories, not `commit()`
+
+## More Info
+
+- `docs/architecture.md` - Architecture details
+- `docs/patterns.md` - Code patterns

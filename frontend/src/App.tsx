@@ -37,6 +37,43 @@ const ROLE_BADGES: Record<string, string> = {
   viewer: "bg-gray-600",
 };
 
+/* ── Date/time helpers ──────────────────────────────────────────── */
+
+function formatSessionTime(iso: string | null): string {
+  if (!iso) return "";
+  const date = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHr = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHr / 24);
+
+  // Within the last minute
+  if (diffSec < 60) return "Just now";
+  // Within the last hour
+  if (diffMin < 60) return `${diffMin}m ago`;
+  // Within the last 24 hours
+  if (diffHr < 24) return `${diffHr}h ago`;
+  // Yesterday
+  if (diffDay === 1) return "Yesterday";
+  // Within the last 6 days — show day name
+  if (diffDay < 7) {
+    const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    return days[date.getDay()];
+  }
+  // This year — show "Mon D"
+  if (date.getFullYear() === now.getFullYear()) {
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  }
+  // Older — show "Mon D, YYYY"
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 /* ------------------------------------------------------------------ */
 /*  Auth Page                                                          */
 /* ------------------------------------------------------------------ */
@@ -556,7 +593,7 @@ export default function App() {
                 No sessions yet. Start a chat to create one.
               </p>
             ) : (
-              <div className="max-h-64 space-y-2 overflow-y-auto">
+              <div className="max-h-80 space-y-2 overflow-y-auto">
                 {userSessions.map((s) => (
                   <button
                     key={s.session_id}
@@ -567,19 +604,22 @@ export default function App() {
                         : ""
                     }`}
                   >
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-800 text-xs text-gray-400">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gray-800 text-xs text-gray-400">
                       <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                       </svg>
                     </div>
-                    <div className="flex-1 truncate">
-                      <p className="text-sm text-gray-200">
-                        {s.title ?? s.session_id.slice(0, 16) + "…"}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm text-gray-200">
+                        {s.title ?? "Chat " + s.session_id.slice(0, 8) + "…"}
+                      </p>
+                      <p className="mt-0.5 truncate text-[11px] text-gray-500">
+                        {formatSessionTime(s.created_at)}
+                        {s.message_count > 0 && (
+                          <> · {s.message_count} {s.message_count === 1 ? "message" : "messages"}</>
+                        )}
                       </p>
                     </div>
-                    <span className="text-xs text-gray-500">
-                      {s.session_id.slice(0, 8)}
-                    </span>
                   </button>
                 ))}
               </div>

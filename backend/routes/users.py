@@ -14,6 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.database import (
     create_user,
+    get_session_created_at,
+    get_session_messages,
     get_session_title,
     get_user,
     get_user_by_username,
@@ -57,6 +59,8 @@ class UserOut(BaseModel):
 class UserSessionOut(BaseModel):
     session_id: str
     title: str | None = None
+    created_at: str | None = None
+    message_count: int = 0
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
@@ -150,5 +154,19 @@ async def user_sessions_endpoint(
     result: list[UserSessionOut] = []
     for sid in session_ids:
         title = await get_session_title(sid)
-        result.append(UserSessionOut(session_id=sid, title=title))
+        created_at = await get_session_created_at(sid)
+        messages = await get_session_messages(sid)
+        result.append(
+            UserSessionOut(
+                session_id=sid,
+                title=title,
+                created_at=created_at,
+                message_count=len(messages),
+            )
+        )
+    # Sort newest first by created_at (sessions without timestamp go last)
+    result.sort(
+        key=lambda s: s.created_at or "",
+        reverse=True,
+    )
     return result
