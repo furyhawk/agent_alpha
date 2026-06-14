@@ -86,9 +86,10 @@ async def _resolve_user_id(
         return None
     scheme, _, token = authorization.partition(" ")
     if scheme.lower() == "bearer" and token:
-        from backend.core.database import resolve_auth_token
+        from backend.core.database import get_valkey as _get_valkey
+        from backend.repositories.auth_token_repo import resolve_token
 
-        return await resolve_auth_token(token)
+        return await resolve_token(await _get_valkey(), token)
     return None
 
 

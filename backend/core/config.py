@@ -38,12 +38,6 @@ class Settings(BaseSettings):
     milvus_uri: str = "http://localhost:19530"
     milvus_token: str = ""
 
-    # ── Redis pub/sub (for RAG status SSE) ─────────────────────────────────
-
-    redis_host: str = "localhost"
-    redis_port: int = 6379
-    redis_db: int = 0
-
     # ── Media & File Storage ───────────────────────────────────────────────
 
     media_dir: str = "media"

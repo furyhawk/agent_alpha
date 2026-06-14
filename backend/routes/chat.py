@@ -10,18 +10,12 @@ import uuid
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
+from redis.asyncio import Redis
 
 from backend.core.agent import AgentService
-from backend.core.database import (
-    get_session_messages,
-    get_session_title,
-    get_session_user_id,
-    list_sessions,
-    resolve_auth_token,
-    save_message,
-    set_session_title,
-)
-from backend.core.dependencies import get_agent_service
+from backend.core.dependencies import get_agent_service, get_valkey
+from backend.services.auth_service import AuthService
+from backend.services.chat_service import ChatService
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -55,6 +49,7 @@ class SessionOut(BaseModel):
 
 
 async def _resolve_user_id(
+    valkey: Redis = Depends(get_valkey),
     user_id: str | None = None,
     authorization: str | None = Header(None),
 ) -> str | None:
@@ -64,7 +59,11 @@ async def _resolve_user_id(
     if authorization is not None:
         scheme, _, token = authorization.partition(" ")
         if scheme.lower() == "bearer" and token:
-            return await resolve_auth_token(token)
+            # We need the auth service but don't have a DB session here.
+            # Delegate to a minimal token lookup via Valkey directly.
+            from backend.repositories import auth_token_repo
+
+            return await auth_token_repo.resolve_token(valkey, token)
     return None
 
 
@@ -75,6 +74,7 @@ async def _resolve_user_id(
 async def chat_endpoint(
     body: ChatRequest,
     agent: AgentService = Depends(get_agent_service),
+    valkey: Redis = Depends(get_valkey),
     user_id: str | None = Depends(_resolve_user_id),
 ) -> ChatResponse:
     """Send a user message to the agent and return its reply.
@@ -85,11 +85,12 @@ async def chat_endpoint(
     (via ``Authorization: Bearer <token>`` header) or to the explicit
     ``user_id`` field in the request body.
     """
+    chat_service = ChatService(valkey)
     session_id = body.session_id or uuid.uuid4().hex
 
     try:
         # Persist the user message (linked to authenticated user).
-        await save_message(
+        await chat_service.save_message(
             session_id,
             "user",
             body.message,
@@ -97,18 +98,16 @@ async def chat_endpoint(
         )
 
         # Generate a short title from the first user message if not yet set.
-        existing_title = await get_session_title(session_id)
+        existing_title = await chat_service.get_title(session_id)
         if existing_title is None:
-            title = body.message.strip()[:60]
-            if len(body.message.strip()) > 60:
-                title += "…"
-            await set_session_title(session_id, title or "New chat")
+            title = await chat_service.generate_title(body.message)
+            await chat_service.set_title(session_id, title or "New chat")
 
         # Ask the agent — returns output + token usage.
         result = await agent.ask(body.message, session_id=session_id)
 
         # Persist the assistant reply.
-        await save_message(session_id, "assistant", result.output)
+        await chat_service.save_message(session_id, "assistant", result.output)
 
         return ChatResponse(
             reply=result.output,
@@ -126,9 +125,13 @@ async def chat_endpoint(
 
 
 @router.get("/history", response_model=list[MessageOut])
-async def get_history(session_id: str) -> list[MessageOut]:
+async def get_history(
+    session_id: str,
+    valkey: Redis = Depends(get_valkey),
+) -> list[MessageOut]:
     """Return all messages for a given session."""
-    messages = await get_session_messages(session_id)
+    chat_service = ChatService(valkey)
+    messages = await chat_service.get_messages(session_id)
     return [MessageOut(**msg) for msg in messages]
 
 
@@ -137,6 +140,7 @@ async def get_history(session_id: str) -> list[MessageOut]:
 
 @router.get("/sessions", response_model=list[SessionOut])
 async def sessions_list(
+    valkey: Redis = Depends(get_valkey),
     user_id: str | None = Query(None, description="Filter by user ID"),
 ) -> list[SessionOut]:
     """Return all known session IDs with their message counts.
@@ -144,18 +148,18 @@ async def sessions_list(
     If ``user_id`` is provided, only sessions belonging to that user
     are returned.
     """
-    if user_id is not None:
-        from backend.core.database import list_user_sessions
+    chat_service = ChatService(valkey)
 
-        ids = await list_user_sessions(user_id)
+    if user_id is not None:
+        ids = await chat_service.list_user_sessions(user_id)
     else:
-        ids = await list_sessions()
+        ids = await chat_service.list_sessions()
 
     result: list[SessionOut] = []
     for sid in ids:
-        msgs = await get_session_messages(sid)
-        uid = await get_session_user_id(sid)
-        title = await get_session_title(sid)
+        msgs = await chat_service.get_messages(sid)
+        uid = await chat_service.get_session_user_id(sid)
+        title = await chat_service.get_title(sid)
         result.append(
             SessionOut(
                 session_id=sid,

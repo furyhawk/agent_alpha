@@ -8,22 +8,15 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.core.database import (
-    create_user,
-    get_session_created_at,
-    get_session_messages,
-    get_session_title,
-    get_user,
-    get_user_by_username,
-    list_user_sessions,
-    list_users,
-    update_user,
-)
-from backend.core.dependencies import get_db_session
+from backend.core.dependencies import get_db_session, get_valkey
+from backend.core.exceptions import NotFoundError
+from backend.services.chat_service import ChatService
+from backend.services.user_service import UserService
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -89,20 +82,21 @@ async def create_user_endpoint(
     session: AsyncSession = Depends(get_db_session),
 ) -> UserOut:
     """Create a new user."""
+    user_service = UserService(session)
+
     # Check for duplicate username.
-    existing = await get_user_by_username(body.username, session=session)
+    existing = await user_service.get_by_username(body.username)
     if existing is not None:
         raise HTTPException(
             status_code=409,
             detail=f"User '{body.username}' already exists",
         )
 
-    user = await create_user(
+    user = await user_service.create(
         username=body.username,
         display_name=body.display_name,
         role=body.role,
         team=body.team,
-        session=session,
     )
     return _user_to_out(user)
 
@@ -112,7 +106,8 @@ async def list_users_endpoint(
     session: AsyncSession = Depends(get_db_session),
 ) -> list[UserOut]:
     """List all active users."""
-    users = await list_users(session=session)
+    user_service = UserService(session)
+    users = await user_service.list_active()
     return [_user_to_out(u) for u in users]
 
 
@@ -122,7 +117,8 @@ async def get_user_endpoint(
     session: AsyncSession = Depends(get_db_session),
 ) -> UserOut:
     """Get a user by their UUID."""
-    user = await get_user(user_id, session=session)
+    user_service = UserService(session)
+    user = await user_service.get_by_id(user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
     return _user_to_out(user)
@@ -139,8 +135,10 @@ async def update_user_endpoint(
     if not kwargs:
         raise HTTPException(status_code=400, detail="No fields to update")
 
-    user = await update_user(user_id, session=session, **kwargs)
-    if user is None:
+    user_service = UserService(session)
+    try:
+        user = await user_service.update(user_id, **kwargs)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="User not found")
     return _user_to_out(user)
 
@@ -148,14 +146,16 @@ async def update_user_endpoint(
 @router.get("/{user_id}/sessions", response_model=list[UserSessionOut])
 async def user_sessions_endpoint(
     user_id: uuid.UUID,
+    valkey: Redis = Depends(get_valkey),
 ) -> list[UserSessionOut]:
     """List all session IDs associated with a user."""
-    session_ids = await list_user_sessions(str(user_id))
+    chat_service = ChatService(valkey)
+    session_ids = await chat_service.list_user_sessions(str(user_id))
     result: list[UserSessionOut] = []
     for sid in session_ids:
-        title = await get_session_title(sid)
-        created_at = await get_session_created_at(sid)
-        messages = await get_session_messages(sid)
+        title = await chat_service.get_title(sid)
+        created_at = await chat_service.get_created_at(sid)
+        messages = await chat_service.get_messages(sid)
         result.append(
             UserSessionOut(
                 session_id=sid,

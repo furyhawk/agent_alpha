@@ -6,19 +6,16 @@ Users authenticate with username + password and receive a bearer token
 
 from __future__ import annotations
 
+import uuid as _uuid
+
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.core.database import (
-    authenticate_user,
-    create_auth_token,
-    create_user_with_password,
-    get_user_by_username,
-    resolve_auth_token,
-    revoke_auth_token,
-)
-from backend.core.dependencies import get_db_session
+from backend.core.dependencies import get_db_session, get_valkey
+from backend.services.auth_service import AuthService
+from backend.services.user_service import UserService
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -81,32 +78,28 @@ async def _get_token_from_header(
 async def register_endpoint(
     body: RegisterRequest,
     session: AsyncSession = Depends(get_db_session),
+    valkey: Redis = Depends(get_valkey),
 ) -> AuthResponse:
     """Register a new user with a password."""
+    auth_service = AuthService(session, valkey)
+    user_service = UserService(session)
+
     # Check for duplicate username.
-    existing = await get_user_by_username(body.username, session=session)
+    existing = await user_service.get_by_username(body.username)
     if existing is not None:
         raise HTTPException(
             status_code=409,
             detail=f"User '{body.username}' already exists",
         )
 
-    # First user to register becomes an admin automatically.
-    from backend.core.database import count_users
-
-    total_users = await count_users(session=session)
-    role = "admin" if total_users == 0 else body.role
-
-    user = await create_user_with_password(
+    user, token = await auth_service.register(
         username=body.username,
         display_name=body.display_name,
         password=body.password,
-        role=role,
+        role=body.role,
         team=body.team,
-        session=session,
     )
 
-    token = await create_auth_token(str(user.id))
     return AuthResponse(
         token=token,
         user_id=str(user.id),
@@ -121,16 +114,18 @@ async def register_endpoint(
 async def login_endpoint(
     body: LoginRequest,
     session: AsyncSession = Depends(get_db_session),
+    valkey: Redis = Depends(get_valkey),
 ) -> AuthResponse:
     """Authenticate with username + password. Returns a bearer token."""
-    user = await authenticate_user(body.username, body.password, session=session)
-    if user is None:
+    auth_service = AuthService(session, valkey)
+    result = await auth_service.login(body.username, body.password)
+    if result is None:
         raise HTTPException(
             status_code=401,
             detail="Invalid username or password",
         )
 
-    token = await create_auth_token(str(user.id))
+    user, token = result
     return AuthResponse(
         token=token,
         user_id=str(user.id),
@@ -144,24 +139,24 @@ async def login_endpoint(
 @router.get("/me", response_model=MeResponse)
 async def me_endpoint(
     token: str = Depends(_get_token_from_header),
+    session: AsyncSession = Depends(get_db_session),
+    valkey: Redis = Depends(get_valkey),
 ) -> MeResponse:
     """Return the current authenticated user's profile.
 
     Requires ``Authorization: Bearer <token>`` header.
     """
-    from backend.core.database import get_user
-    from backend.core.database import open_session as _open_db
+    auth_service = AuthService(session, valkey)
+    user_service = UserService(session)
 
-    user_id = await resolve_auth_token(token)
+    user_id = await auth_service.resolve_token(token)
     if user_id is None:
         raise HTTPException(
             status_code=401,
             detail="Invalid or expired token",
         )
 
-    async with _open_db() as session:
-        user = await get_user(uuid_obj(user_id), session=session)
-
+    user = await user_service.get_by_id(_uuid.UUID(user_id))
     if user is None or not user.is_active:
         raise HTTPException(
             status_code=401,
@@ -180,19 +175,12 @@ async def me_endpoint(
 @router.post("/logout", status_code=204)
 async def logout_endpoint(
     token: str = Depends(_get_token_from_header),
+    session: AsyncSession = Depends(get_db_session),
+    valkey: Redis = Depends(get_valkey),
 ) -> None:
     """Revoke the current auth token (logout).
 
     Requires ``Authorization: Bearer <token>`` header.
     """
-    await revoke_auth_token(token)
-
-
-# ── Helpers ────────────────────────────────────────────────────────────────
-
-
-def uuid_obj(value: str) -> object:
-    """Convert a string UUID to a UUID object for DB queries."""
-    import uuid as _uuid
-
-    return _uuid.UUID(value)
+    auth_service = AuthService(session, valkey)
+    await auth_service.logout(token)

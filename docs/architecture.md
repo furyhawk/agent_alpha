@@ -1,8 +1,8 @@
 # Architecture Guide
 
-The project uses a **hybrid** architecture. Core features (users, auth, chat)
-are handled with flat function-based calls from routes into `database.py`.
-RAG features follow a proper **Repository + Service** layered pattern.
+This project follows a **Repository + Service** layered architecture.
+Every feature — users, conversations, files, RAG documents, sync sources — uses
+the same pattern: **Models → Schemas → Repositories → Services → Endpoints**.
 
 ## Request Flows
 
@@ -30,15 +30,13 @@ backend/
 ### Core features (flat pattern — users, auth, chat)
 
 ```
-HTTP Request → Route → database.py functions → PostgreSQL / Valkey
+HTTP Request → Route → Service → Repository → Database (PostgreSQL / Valkey)
                   ↓
-              Response ←
+              Response ← Service ← Repository ←
 ```
 
-Routes in `routes/{auth,users,chat,admin}.py` call functions directly
-from `core/database.py`, which contains both PostgreSQL queries and
-Valkey (Redis-compatible) data access. There are no intermediate
-service or repository layers for these features.
+Routes never contain direct database calls. All data access goes through
+services, which in turn delegate to repositories.
 
 ```
 backend/
@@ -53,6 +51,28 @@ backend/
     ├── admin.py        # Admin dashboard (stats, users, sessions)
     └── health.py       # Health check
 ```
+
+### API Routes (`api/routes/v1/`)
+- HTTP request/response handling
+- Input validation via Pydantic schemas
+- Authentication and authorization checks
+- **Never** contains direct DB calls — always delegates to a service
+
+### Services (`services/`)
+- Business logic and validation
+- Orchestrates one or more repository calls
+- Raises domain exceptions (`NotFoundError`, `AlreadyExistsError`, etc.)
+- Manages transaction boundaries
+
+### Repositories (`repositories/`)
+- Database operations only
+- No business logic
+- Uses `db.flush()` not `commit()` (the dependency-injected session manages transactions)
+- Returns domain models
+
+### Schemas (`schemas/`)
+- Separate `Create`, `Update`, and `Response` models per entity
+- `Response` schemas use `model_config = ConfigDict(from_attributes=True)` for ORM conversion
 
 ## Data Stores
 

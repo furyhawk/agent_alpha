@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, AsyncIterator
 
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.agent import AgentService
 from backend.core.database import get_session as _get_db_session
+from backend.core.database import get_valkey as _get_valkey
 
 if TYPE_CHECKING:
     from backend.core.config import Settings
@@ -32,3 +34,8 @@ async def get_db_session() -> AsyncIterator[AsyncSession]:
     """Provide an async SQLAlchemy session for route dependencies."""
     async for session in _get_db_session():
         yield session
+
+
+async def get_valkey() -> Redis:
+    """Provide the shared Valkey (Redis) async client."""
+    return await _get_valkey()
