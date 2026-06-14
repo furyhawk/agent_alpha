@@ -1,14 +1,21 @@
 # ──────────────────────────────────────────────────────────────────
-#  Agent Alpha — Docker Compose
+#  Agent Alpha — Compose Stack
 #
-#  Usage:
+#  Usage (Docker):
 #    docker compose up -d              # start everything
 #    docker compose up -d --build      # rebuild & start
 #    docker compose down               # stop & remove
 #
+#  Usage (Podman):
+#    podman compose up -d              # start everything
+#    podman compose up -d --build      # rebuild & start
+#    podman compose down               # stop & remove
+#
+#  The Makefile auto-detects the available runtime. Either works.
+#
 #  Requires:
-#    - Docker (or Podman with docker-compose compatibility)
-#    - An OpenAI-compatible LLM endpoint (set LLM_BASE_URL)
+#    - Docker or Podman
+#    - A llama.cpp server (or any OpenAI-compatible LLM — set LLM_BASE_URL)
 # ──────────────────────────────────────────────────────────────────
 
 services:

@@ -35,6 +35,10 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     reply: str
     session_id: str
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_tokens: int = 0
+    elapsed_seconds: float = 0.0
 
 
 class MessageOut(BaseModel):
@@ -100,13 +104,20 @@ async def chat_endpoint(
                 title += "…"
             await set_session_title(session_id, title or "New chat")
 
-        # Ask the agent.
-        output = await agent.ask(body.message, session_id=session_id)
+        # Ask the agent — returns output + token usage.
+        result = await agent.ask(body.message, session_id=session_id)
 
         # Persist the assistant reply.
-        await save_message(session_id, "assistant", output)
+        await save_message(session_id, "assistant", result.output)
 
-        return ChatResponse(reply=output, session_id=session_id)
+        return ChatResponse(
+            reply=result.output,
+            session_id=session_id,
+            input_tokens=result.input_tokens,
+            output_tokens=result.output_tokens,
+            total_tokens=result.total_tokens,
+            elapsed_seconds=result.elapsed_seconds,
+        )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 

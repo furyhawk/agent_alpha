@@ -26,6 +26,10 @@ function authHeaders(): Record<string, string> {
 export interface ChatResponse {
   reply: string;
   session_id: string;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  elapsed_seconds: number;
 }
 
 export interface MessageData {
