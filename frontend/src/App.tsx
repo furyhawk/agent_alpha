@@ -233,6 +233,9 @@ export default function App() {
   const [userSessions, setUserSessions] = useState<UserSessionData[]>([]);
   const [showSessions, setShowSessions] = useState(false);
 
+  /* ── Raw/rendered message toggle state ─────────────────────────────── */
+  const [rawMessages, setRawMessages] = useState<Set<number>>(new Set());
+
   const bottomRef = useRef<HTMLDivElement>(null);
 
   /* Restore auth session from stored token */
@@ -362,6 +365,22 @@ export default function App() {
       .catch(() => {
         setMessages([]);
       });
+  };
+
+  /* ── Copy to clipboard ───────────────────────────────────────────── */
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.className = "fixed left-[-9999px]";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+    }
   };
 
   /* ── Chat handler ────────────────────────────────────────────────── */
@@ -595,13 +614,45 @@ export default function App() {
               className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
             >
               <div
-                className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                className={`group max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
                   msg.role === "user"
                     ? "bg-indigo-600 text-white"
                     : "bg-gray-800 text-gray-100"
                 }`}
               >
-                <Markdown content={msg.content} />
+                {msg.role === "assistant" && rawMessages.has(i) ? (
+                  <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed text-gray-300">{msg.content}</pre>
+                ) : (
+                  <Markdown content={msg.content} />
+                )}
+
+                {/* Toolbar for assistant messages */}
+                {msg.role === "assistant" && (
+                  <div className="mt-2 flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+                    <button
+                      onClick={() => copyToClipboard(msg.content)}
+                      className="rounded-md border border-gray-700 px-2 py-0.5 text-[10px] text-gray-500 transition hover:border-indigo-500 hover:text-indigo-400"
+                      title="Copy raw markdown text"
+                    >
+                      📋 Copy
+                    </button>
+                    <button
+                      onClick={() => {
+                        setRawMessages((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(i)) next.delete(i);
+                          else next.add(i);
+                          return next;
+                        });
+                      }}
+                      className="rounded-md border border-gray-700 px-2 py-0.5 text-[10px] text-gray-500 transition hover:border-indigo-500 hover:text-indigo-400"
+                      title="Toggle between rendered and raw view"
+                    >
+                      {rawMessages.has(i) ? "✦ Markdown" : "📄 Raw"}
+                    </button>
+                  </div>
+                )}
+
                 {msg.role === "assistant" && msg.totalTokens !== undefined && (
                   <div className="mt-1.5 flex flex-wrap gap-3 text-[10px] text-gray-500">
                     <span title="Input tokens sent to the model">
