@@ -114,3 +114,4 @@ Environment variables loaded from `.env` via `pydantic-settings` (`backend/core/
 
 - `docs/architecture.md` - Architecture details
 - `docs/patterns.md` - Code patterns
+- `docs/adding_features.md` - How to add features

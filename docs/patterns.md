@@ -5,7 +5,7 @@
 Use FastAPI's `Depends()` for injecting dependencies:
 
 ```python
-from app.api.deps import get_db, get_current_user
+from backend.core.dependencies import get_db, get_current_user
 
 @router.get("/conversations")
 async def list_conversations(
@@ -19,7 +19,7 @@ async def list_conversations(
 > **Important:** Routes never contain direct database calls. All data access
 > goes through a service, which in turn delegates to a repository.
 
-Available dependencies in `app/api/deps.py`:
+Available dependencies in `backend/core/dependencies.py`:
 - `get_db` - Database session
 - `get_current_user` - Authenticated user (raises 401 if not authenticated)
 - `get_current_user_optional` - User or None
@@ -84,7 +84,7 @@ class ConversationRepository:
 Use domain exceptions in services:
 
 ```python
-from app.core.exceptions import NotFoundError, AlreadyExistsError, ValidationError
+from backend.core.exceptions import NotFoundError, AlreadyExistsError, ValidationError
 
 # In service
 if not conversation:
