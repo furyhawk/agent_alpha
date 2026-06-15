@@ -10,6 +10,7 @@ from pydantic_ai import Agent
 from pydantic_ai.capabilities import MCP, Thinking, ToolSearch, WebSearch
 from pydantic_ai.models.openai import OpenAIResponsesModel
 from pydantic_ai.providers.openai import OpenAIProvider
+from pydantic_ai.tools import Tool
 from pydantic_ai_harness import CodeMode
 
 # Community packages, alphabetical:
@@ -62,6 +63,7 @@ class AgentService:
         self._agent = Agent(
             self._model,
             capabilities=self._build_capabilities(),
+            tools=self._build_rag_tools(),
         )
 
     async def shutdown(self) -> None:
@@ -88,6 +90,17 @@ class AgentService:
         )
 
     # ── Internal helpers ───────────────────────────────────────────────────
+
+    @staticmethod
+    def _build_rag_tools() -> list[Tool]:
+        """Build RAG search tools for document retrieval."""
+        from skills.rag_search.search import rag_search, rag_search_by_document, rag_list_collections
+
+        return [
+            Tool(rag_search, name="rag_search"),
+            Tool(rag_search_by_document, name="rag_search_by_document"),
+            Tool(rag_list_collections, name="rag_list_collections"),
+        ]
 
     def _build_capabilities(self) -> list:
         """Assemble the full list of agent capabilities."""
