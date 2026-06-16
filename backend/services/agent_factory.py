@@ -3,6 +3,8 @@ import logfire
 from pydantic_ai.models.openai import OpenAIResponsesModel
 from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai import Agent
+from pydantic_ai.capabilities import MCP, ToolSearch, WebSearch
+from pydantic_ai_harness import CodeMode
 from pydantic_deep import create_deep_agent
 from subagents_pydantic_ai import SubAgentConfig
 from pydantic_ai_shields import InputGuard, SecretRedaction, ToolGuard
