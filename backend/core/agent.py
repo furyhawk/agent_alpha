@@ -26,25 +26,22 @@ Configuration via settings:
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import logfire
 from pydantic_ai import Agent
-from pydantic_ai.capabilities import MCP, Thinking, ToolSearch, WebSearch
+from pydantic_ai.capabilities import MCP, ToolSearch, WebSearch
 from pydantic_ai.models.openai import OpenAIResponsesModel
 from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.tools import Tool
 from pydantic_ai_harness import CodeMode
 
 # Community packages, alphabetical:
-from pydantic_ai_backends import ConsoleCapability, LocalBackend
-from pydantic_ai_shields import CostTracking, InputGuard, SecretRedaction, ToolGuard
-from pydantic_ai_skills import SkillsCapability
-from pydantic_ai_summarization import ContextManagerCapability
-from pydantic_ai_todo import TodoCapability
-from pydantic_deep import MemoryCapability, StuckLoopDetection
+from pydantic_ai_backends import LocalBackend
+from pydantic_ai_shields import InputGuard, SecretRedaction, ToolGuard
+from pydantic_deep import create_deep_agent
 from pydantic_deep.deps import DeepAgentDeps
-from subagents_pydantic_ai import SubAgentCapability, SubAgentConfig
+from subagents_pydantic_ai import SubAgentConfig
 
 from backend.core.config import Settings
 
@@ -58,7 +55,7 @@ class AgentService:
 
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
-        self._agent: Agent | None = None
+        self._agent: Agent[DeepAgentDeps, str] | None = None
         self._model: OpenAIResponsesModel | None = None
 
     # ── Lifecycle ──────────────────────────────────────────────────────────
@@ -83,10 +80,42 @@ class AgentService:
             ),
         )
 
-        self._agent = Agent(
-            self._model,
-            capabilities=self._build_capabilities(),
+        self._agent = create_deep_agent(
+            model=self._model,
+            include_todo=True,
+            include_filesystem=True,
+            include_subagents=True,
+            include_skills=True,
+            include_plan=True,
+            include_execute=False,
+            include_memory=True,
+            memory_dir=_MEMORY_DIR,
+            web_search=False,
+            web_fetch=True,
+            thinking="xhigh",
+            context_manager=True,
+            context_manager_max_tokens=100_000,
+            cost_tracking=True,
+            cost_budget_usd=5.0,
+            stuck_loop_detection=True,
+            subagents=[
+                SubAgentConfig(
+                    name="researcher",
+                    description="Deep research on a topic",
+                    instructions="You are a thorough research assistant.",
+                ),
+            ],
+            skill_directories=["./skills"],
             tools=self._build_rag_tools(),
+            capabilities=[
+                CodeMode(),
+                ToolSearch(),
+                MCP("https://hn.caseyjhand.com/mcp", native=True),
+                WebSearch(local="duckduckgo"),
+                InputGuard(guard=lambda p: "ignore previous instructions" not in p.lower()),
+                ToolGuard(blocked=["rm"], require_approval=["write_file"]),
+                SecretRedaction(),
+            ],
         )
 
     async def shutdown(self) -> None:
@@ -123,36 +152,6 @@ class AgentService:
             Tool(rag_search, name="rag_search"),
             Tool(rag_search_by_document, name="rag_search_by_document"),
             Tool(rag_list_collections, name="rag_list_collections"),
-        ]
-
-    def _build_capabilities(self) -> list:
-        """Assemble the full list of agent capabilities."""
-        return [
-            CodeMode(),
-            ToolSearch(),
-            Thinking(effort="xhigh"),
-            ContextManagerCapability(max_tokens=100_000),
-            MCP("https://hn.caseyjhand.com/mcp", native=True),
-            WebSearch(local="duckduckgo"),
-            ConsoleCapability(),
-            MemoryCapability(agent_name="harness-agent", memory_dir=_MEMORY_DIR),
-            SkillsCapability(directories=["./skills"]),
-            SubAgentCapability(
-                subagents=[
-                    SubAgentConfig(
-                        name="researcher",
-                        description="Deep research on a topic",
-                        instructions="You are a thorough research assistant.",
-                    ),
-                ],
-                default_model=self._model,
-            ),
-            TodoCapability(enable_subtasks=True),
-            CostTracking(budget_usd=5.0),
-            InputGuard(guard=lambda p: "ignore previous instructions" not in p.lower()),
-            ToolGuard(blocked=["rm"], require_approval=["write_file"]),
-            SecretRedaction(),
-            StuckLoopDetection(),
         ]
 
 
