@@ -1,4 +1,27 @@
-"""Agent lifecycle: builds the shared agent instance loaded by the API routes."""
+"""PydanticDeep assistant — deep agentic coding assistant.
+
+PydanticDeep is built on PydanticAI and provides:
+- Filesystem tools: ls, read_file, write_file, edit_file, glob, grep
+- Task management: write_todos, planning subagent
+- Subagent delegation
+- Skills system (SKILL.md files)
+- Memory persistence (MEMORY.md across sessions)
+- Context file discovery (AGENTS.md, SOUL.md from workspace root)
+- Built-in web search and web fetch
+
+Backend types (set via PYDANTIC_DEEP_BACKEND_TYPE):
+  "state"   — In-memory (default, no persistence)
+  "daytona" — Daytona cloud workspace (isolated, cloud-native)
+
+Configuration via settings:
+  PYDANTIC_DEEP_BACKEND_TYPE  : "state" | "daytona" (default: "state")
+  PYDANTIC_DEEP_INCLUDE_SUBAGENTS : enable subagent delegation (default: True)
+  PYDANTIC_DEEP_INCLUDE_SKILLS    : enable skills system (default: True)
+  PYDANTIC_DEEP_INCLUDE_PLAN      : enable planner subagent (default: True)
+  PYDANTIC_DEEP_INCLUDE_MEMORY    : enable persistent MEMORY.md (default: True)
+  PYDANTIC_DEEP_INCLUDE_EXECUTE   : enable shell execution (default: False)
+  PYDANTIC_DEEP_WEB_SEARCH        : enable built-in web search (default: True)
+"""
 
 from __future__ import annotations
 
