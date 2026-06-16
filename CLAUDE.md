@@ -31,15 +31,18 @@ Agent Alpha is a full-stack agentic AI application consisting of a FastAPI backe
 ### Backend Architecture (`/backend`)
 The backend follows a layered architecture:
 - **Core (`/backend/core`)**: The heart of the application. Contains configuration (`config.py`), database engine initialization (`database.py`), ORM models (`models.py`), and the primary agent lifecycle/inference logic (`agent.py`).
+    - `AgentService` is a thin orchestrator that receives a pre-built `Agent` via constructor injection (wired at startup in `app.py`'s lifespan).
 - **Database & Repositories**: 
     - **Models**: SQL Alchemy ORM models are split between general domain models (in `core`) and RAG-specific models (in `db/models` like `ChatFile`, `RagDocument`).
-    - **Repositories**: Abstracted CRUD operations for all DB models are located in `/backend/repositories`.
+    - **Repositories**: Abstracted CRUD operations for all DB models are located in `/backend/repositories`. `MemoryRepository` encapsulates filesystem persistence for agent memories via `LocalBackend`.
 - **RAG Pipeline (`/backend/rag`)**: Handles the document ingestion lifecycle. 
     - `connectors.py` manages sync sources.
     - `ingestion.py` manages the Parse → Chunk → Embed → Store pipeline.
     - `retrieval.py` and `reranker.py` handle multi-stage vector search and scoring.
     - `vectorstore.py` interfaces with Milvus.
 - **Services**: Domain-specific logic for file storage, RAG tracking, status streaming (via Redis/SSE), and synchronization.
+    - `agent_factory.py` provides `build_agent()` — a factory that wires model providers, Logfire, capabilities (`CodeMode`, `ToolSearch`, `MCP`, `WebSearch`, `InputGuard`, `ToolGuard`), subagents, skills, and RAG tools into a `pydantic-ai` agent.
+    - `rag_service.py` provides `RagService` which builds RAG search tools for document retrieval.
 - **Routes & Schemas**: FastAPI endpoints (`/routes`) are paired with Pydantic models (`/schemas`) for request validation and response serialization.
 - **Worker**: Handles asynchronous tasks (like heavy RAG ingestion) via an in-process dispatcher, designed to eventually move to a Redis-backed ARQ setup.
 
