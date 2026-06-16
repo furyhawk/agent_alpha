@@ -11,7 +11,10 @@ from uvicorn.logging import DefaultFormatter
 
 from backend.core.config import Settings
 from backend.core.database import close_engine, close_valkey, init_db
-from backend.core.dependencies import get_agent_service
+from backend.core.agent import AgentService, set_service
+from backend.repositories.memory_repository import MemoryRepository
+from backend.services.agent_factory import build_agent
+from backend.services.rag_service import RagService
 from backend.routes.admin import router as admin_router
 from backend.routes.auth import router as auth_router
 from backend.routes.chat import router as chat_router
@@ -60,7 +63,9 @@ class AppBuilder:
     """Builds and configures the FastAPI application with DI wiring.
 
     Accepts a ``Settings`` instance so tests can supply custom config.
-    The ``AgentService`` is lazily initialised inside the lifespan.
+    The ``AgentService`` is built inside the lifespan hook, which wires
+    ``MemoryRepository``, ``RagService``, and the agent factory together
+    and registers the result as a module-level singleton.
     """
 
     def __init__(self, settings: Settings | None = None) -> None:
@@ -110,9 +115,12 @@ class AppBuilder:
         # Create database tables if they don't exist.
         await init_db()
 
-        # Initialise the agent service on startup.
-        agent_service = await get_agent_service()
-        agent_service.initialize()
+        # Build agent with full dependency injection via the factory.
+        memory_repo = MemoryRepository()
+        rag_service = RagService()
+        agent = build_agent(self._settings, memory_repo, rag_service)
+        agent_service = AgentService(agent=agent, memory_repo=memory_repo)
+        set_service(agent_service)
 
         yield
 

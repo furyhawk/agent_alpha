@@ -27,40 +27,27 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
+from typing import Any
 
 from pydantic_ai import Agent
-from pydantic_ai.tools import Tool
-from pydantic_ai_harness import CodeMode
 
-from backend.core.config import Settings
 from backend.repositories.memory_repository import MemoryRepository
-from backend.services.agent_factory import build_agent
-from backend.services.rag_service import RagService
 from pydantic_deep.deps import DeepAgentDeps
 
-class AgentService:
-    """Encapsulates agent construction, execution, and teardown.
 
-    Uses lazy initialization so the agent is not built at import time.
-    Accepts a ``Settings`` instance for testability (dependency injection).
+class AgentService:
+    """Thin orchestrator for agent execution.
+
+    Receives a pre-built ``Agent`` and its ``MemoryRepository`` via
+    constructor injection so the lifespan (or tests) control wiring.
+    No lazy initialisation — the agent is ready to run immediately.
     """
 
-    def __init__(self, settings: Settings) -> None:
-        self._settings = settings
-        self._agent: Agent[any, str] | None = None
+    def __init__(self, agent: Agent[Any, str], memory_repo: MemoryRepository) -> None:
+        self._agent = agent
+        self._memory_repo = memory_repo
 
     # ── Lifecycle ──────────────────────────────────────────────────────────
-
-    def initialize(self) -> None:
-        """Build the agent. Idempotent — safe to call multiple times."""
-        if self._agent is not None:
-            return
-
-        memory_repo = MemoryRepository()
-        rag_service = RagService()
-
-        # The factory handles all complex initialization logic
-        self._agent = build_agent(self._settings, memory_repo, rag_service)
 
     async def shutdown(self) -> None:
         """Release agent resources."""
@@ -70,17 +57,13 @@ class AgentService:
 
     async def ask(self, prompt: str, session_id: str | None = None) -> AskResult:
         """Send a prompt to the agent and return the text output with usage stats."""
-        self.initialize()
-        assert self._agent is not None
-
-        # Dependency injection using the repository's backend
-        memory_repo = MemoryRepository()
-        deps = DeepAgentDeps(backend=memory_repo.backend)
+        di = DeepAgentDeps(backend=self._memory_repo.backend)
 
         t0 = time.monotonic()
-        result = await self._agent.run(prompt, deps=deps)
+        result = await self._agent.run(prompt, deps=di)
         elapsed = time.monotonic() - t0
         usage = result.usage
+
         return AskResult(
             output=result.output,
             input_tokens=usage.input_tokens,
@@ -88,6 +71,7 @@ class AgentService:
             total_tokens=usage.input_tokens + usage.output_tokens,
             elapsed_seconds=round(elapsed, 2),
         )
+
 
 @dataclass
 class AskResult:
@@ -108,20 +92,22 @@ class AskResult:
     elapsed_seconds: float = 0.0
     """Wall-clock time in seconds the agent took to respond."""
 
+
 # ---------------------------------------------------------------------------
-# Singleton — lazy-initialised on the first call to ``ask()``.
-# Keeps the existing module-level ``ask`` facade so downstream imports in
-# ``chat.py`` continue to work unchanged.
+# Singleton — wired once at startup by the lifespan hook in ``app.py``.
+# Routes access it through ``get_service()``.
 # ---------------------------------------------------------------------------
 
-from backend.core.config import settings as _settings  # noqa: E402
+_service: AgentService | None = None
 
-_service = AgentService(_settings)
 
 def get_service() -> AgentService:
     """Return the singleton AgentService instance."""
+    assert _service is not None, "AgentService has not been initialised — did the lifespan run?"
     return _service
 
-async def ask(prompt: str, session_id: str | None = None) -> AskResult:
-    """Send a prompt to the agent and return the text output with usage stats."""
-    return await _service.ask(prompt, session_id=session_id)
+
+def set_service(service: AgentService) -> None:
+    """Set the module-level singleton (called by the lifespan hook)."""
+    global _service
+    _service = service
