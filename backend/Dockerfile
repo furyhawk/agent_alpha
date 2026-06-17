@@ -32,6 +32,16 @@ RUN apt-get update && \
         nodejs \
     && rm -rf /var/lib/apt/lists/*
 
+# Pre-cache npx MCP server packages so first-time agent runs don't timeout
+# downloading them. Installed globally so `npx -y` finds them immediately.
+# Used by create_mcp_servers() in config.py.
+RUN npm install -g \
+    tavily-mcp@latest \
+    @brave/brave-search-mcp-server@latest \
+    firecrawl-mcp@latest \
+    @playwright/mcp@latest && \
+    npm cache clean --force
+
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /app

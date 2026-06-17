@@ -16,7 +16,7 @@ import logfire
 import pytz
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.capabilities import MCP, ToolSearch, WebSearch
-from pydantic_ai.models.openai import OpenAIResponsesModel
+from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.toolsets import FunctionToolset
 from pydantic_ai_harness import CodeMode
@@ -237,7 +237,7 @@ def build_agent(
             pass  # Logfire is optional
 
     # ── Model ───────────────────────────────────────────────────────────
-    model = OpenAIResponsesModel(
+    model = OpenAIModel(
         settings.llm_model,
         provider=OpenAIProvider(
             base_url=settings.llm_base_url,

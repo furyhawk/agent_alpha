@@ -162,9 +162,22 @@ class ResearchSessionService:
                 sandbox.write("/workspace/MEMORY.md", mem_md.read_bytes())
             deps = DeepAgentDeps(backend=sandbox, checkpoint_store=InMemoryCheckpointStore())
         else:
-            # In-memory state mode — use deps without Docker backend
+            # State mode — use an in-memory StateBackend so the agent's memory
+            # toolset and context file loading don't crash on None.
+            from pydantic_deep import StateBackend
+
+            state_backend = StateBackend()
+
+            # Seed workspace with context files (loaded into memory)
+            deep_md = ws_root / "workspace" / "DEEP.md"
+            if deep_md.exists():
+                state_backend.write("/workspace/DEEP.md", deep_md.read_bytes())
+            mem_md = ws_root / "workspace" / "MEMORY.md"
+            if mem_md.exists():
+                state_backend.write("/workspace/MEMORY.md", mem_md.read_bytes())
+
             deps = DeepAgentDeps(
-                backend=None,
+                backend=state_backend,
                 checkpoint_store=InMemoryCheckpointStore(),
             )
 
@@ -443,21 +456,20 @@ class ResearchSessionService:
 
     async def _process_node(self, websocket, node, run, session):
         """Process a node and send appropriate WebSocket events."""
-        from pydantic_ai import Agent as PydanticAgent
-        from pydantic_deep.nodes import End, UserPromptNode
+        from pydantic_ai import UserPromptNode
 
         if isinstance(node, UserPromptNode):
             await websocket.send_json({"type": "status", "content": "Processing..."})
-        elif PydanticAgent.is_model_request_node(node):
+        elif Agent.is_model_request_node(node):
             await self._stream_model_request(websocket, node, run, session)
-        elif PydanticAgent.is_call_tools_node(node):
+        elif Agent.is_call_tools_node(node):
             await self._stream_tool_calls(websocket, node, run, session)
-        elif isinstance(node, End):
+        elif Agent.is_end_node(node):
             await websocket.send_json({"type": "status", "content": "Completed!"})
 
     async def _stream_model_request(self, websocket, node, run, session):
         """Stream text chunks from a ModelRequestNode."""
-        from pydantic_ai.result import (
+        from pydantic_ai.messages import (
             FinalResultEvent, PartDeltaEvent, PartStartEvent,
         )
         from pydantic_ai.messages import TextPartDelta, ThinkingPartDelta, ToolCallPartDelta
@@ -518,7 +530,7 @@ class ResearchSessionService:
 
         async with node.stream(run.ctx) as handle_stream:
             async for event in handle_stream:
-                if hasattr(event, 'part') and hasattr(event.part, 'tool_name'):
+                if hasattr(event, 'part') and hasattr(event.part, 'tool_name') and hasattr(event.part, 'args'):
                     # FunctionToolCallEvent
                     tool_name = event.part.tool_name
                     tool_args = event.part.args

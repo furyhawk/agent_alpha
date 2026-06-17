@@ -86,7 +86,7 @@ The agent (`create_research_agent` in `agent.py`) uses **pydantic-deep**'s `crea
 
 All optional, enabled by API key presence:
 - **Tavily** — AI search (`npx tavily-mcp`)
-- **Brave Search** — web search (`npx @anthropic-ai/brave-search-mcp`)
+- **Brave Search** — web search (`npx @brave/brave-search-mcp-server`)
 - **Jina** — URL→markdown reader (HTTP MCP at `https://mcp.jina.ai/v1`)
 - **Excalidraw** — live diagrams (Podman container, requires `podman` binary)
 - **Playwright** — browser automation (requires `PLAYWRIGHT_MCP=1`)

@@ -139,6 +139,12 @@ class Settings(BaseSettings):
 
         servers: list = []
 
+        # Common init timeout for MCP servers.
+        # npx-based servers may need to download packages on first run inside Docker,
+        # so the default 5-second timeout is too short. 30s handles first-time downloads
+        # while still failing fast on truly unreachable servers.
+        MCP_INIT_TIMEOUT = 30
+
         # Tavily — AI-optimized web search
         if self.tavily_api_key:
             servers.append(
@@ -150,6 +156,7 @@ class Settings(BaseSettings):
                             env={"TAVILY_API_KEY": self.tavily_api_key},
                         ),
                         max_retries=3,
+                        init_timeout=MCP_INIT_TIMEOUT,
                     ),
                     prefix="tavily",
                 )
@@ -162,10 +169,11 @@ class Settings(BaseSettings):
                     MCPToolset(
                         StdioTransport(
                             command="npx",
-                            args=["-y", "@anthropic-ai/brave-search-mcp@latest"],
+                            args=["-y", "@brave/brave-search-mcp-server@latest"],
                             env={"BRAVE_API_KEY": self.brave_api_key},
                         ),
                         max_retries=3,
+                        init_timeout=MCP_INIT_TIMEOUT,
                     ),
                     prefix="brave",
                 )
@@ -179,6 +187,7 @@ class Settings(BaseSettings):
                         "https://mcp.jina.ai/v1",
                         headers={"Authorization": f"Bearer {self.jina_api_key}"},
                         max_retries=3,
+                        init_timeout=MCP_INIT_TIMEOUT,
                     ),
                     prefix="jina",
                 )
@@ -202,6 +211,7 @@ class Settings(BaseSettings):
                                 "ghcr.io/yctimlin/mcp_excalidraw:latest",
                             ],
                         ),
+                        init_timeout=MCP_INIT_TIMEOUT,
                     ),
                     prefix="excalidraw",
                 )
@@ -218,6 +228,7 @@ class Settings(BaseSettings):
                             command="npx",
                             args=["-y", "@playwright/mcp@latest", "--headless"],
                         ),
+                        init_timeout=MCP_INIT_TIMEOUT,
                     ),
                     prefix="playwright",
                 )
@@ -234,6 +245,7 @@ class Settings(BaseSettings):
                             env={"FIRECRAWL_API_KEY": self.firecrawl_api_key},
                         ),
                         max_retries=3,
+                        init_timeout=MCP_INIT_TIMEOUT,
                     ),
                     prefix="firecrawl",
                 )

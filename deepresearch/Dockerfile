@@ -13,6 +13,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         nodejs docker-ce-cli \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Pre-cache npx MCP server packages so first-time agent runs don't timeout.
+RUN npm install -g \
+    tavily-mcp@latest \
+    @brave/brave-search-mcp-server@latest \
+    firecrawl-mcp@latest \
+    @playwright/mcp@latest && \
+    npm cache clean --force
+
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
 WORKDIR /app

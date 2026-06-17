@@ -74,6 +74,13 @@ def create_mcp_servers() -> list[AbstractToolset]:
     Servers are started/stopped automatically by pydantic-ai when the agent
     enters/exits its async context manager.
     """
+    # Common init timeout for MCP servers.
+    # npx-based servers may need to download packages on first run,
+    # and HTTPS servers (Jina) can be slow to handshake. The pydantic-ai
+    # MCPToolset default is 5s — too short inside Docker where first-time
+    # npx downloads can take 15-30s.
+    MCP_INIT_TIMEOUT = int(os.getenv("MCP_INIT_TIMEOUT", "30"))
+
     servers: list[AbstractToolset] = []
 
     # Tavily — AI-optimized web search (requires TAVILY_API_KEY)
@@ -88,6 +95,7 @@ def create_mcp_servers() -> list[AbstractToolset]:
                         env={"TAVILY_API_KEY": tavily_key},
                     ),
                     max_retries=3,
+                    init_timeout=MCP_INIT_TIMEOUT,
                 ),
                 prefix="tavily",
             )
@@ -101,10 +109,11 @@ def create_mcp_servers() -> list[AbstractToolset]:
                 MCPToolset(
                     StdioTransport(
                         command="npx",
-                        args=["-y", "@anthropic-ai/brave-search-mcp@latest"],
+                        args=["-y", "@brave/brave-search-mcp-server@latest"],
                         env={"BRAVE_API_KEY": brave_key},
                     ),
                     max_retries=3,
+                    init_timeout=MCP_INIT_TIMEOUT,
                 ),
                 prefix="brave",
             )
@@ -121,6 +130,7 @@ def create_mcp_servers() -> list[AbstractToolset]:
                     "https://mcp.jina.ai/v1",
                     headers={"Authorization": f"Bearer {jina_key}"},
                     max_retries=3,
+                    init_timeout=MCP_INIT_TIMEOUT,
                 ),
                 prefix="jina",
             )
@@ -145,6 +155,7 @@ def create_mcp_servers() -> list[AbstractToolset]:
                             "ghcr.io/yctimlin/mcp_excalidraw:latest",
                         ],
                     ),
+                    init_timeout=MCP_INIT_TIMEOUT,
                 ),
                 prefix="excalidraw",
             )
@@ -161,6 +172,7 @@ def create_mcp_servers() -> list[AbstractToolset]:
                         command="npx",
                         args=["-y", "@playwright/mcp@latest", "--headless"],
                     ),
+                    init_timeout=MCP_INIT_TIMEOUT,
                 ),
                 prefix="playwright",
             )
@@ -178,6 +190,7 @@ def create_mcp_servers() -> list[AbstractToolset]:
                         env={"FIRECRAWL_API_KEY": firecrawl_key},
                     ),
                     max_retries=3,
+                    init_timeout=MCP_INIT_TIMEOUT,
                 ),
                 prefix="firecrawl",
             )
