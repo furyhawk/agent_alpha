@@ -15,11 +15,16 @@ from backend.core.agent import AgentService, set_service
 from backend.repositories.memory_repository import MemoryRepository
 from backend.services.agent_factory import build_agent
 from backend.services.rag_service import RagService
+from backend.services.research_session import (
+    ResearchSessionService,
+    set_research_service,
+)
 from backend.routes.admin import router as admin_router
 from backend.routes.auth import router as auth_router
 from backend.routes.chat import router as chat_router
 from backend.routes.health import router as health_router
 from backend.routes.rag import router as rag_router
+from backend.routes.research import router as research_router
 from backend.routes.users import router as users_router
 
 logger = logging.getLogger("agent_alpha")
@@ -99,6 +104,7 @@ class AppBuilder:
         app.include_router(chat_router)
         app.include_router(users_router)
         app.include_router(rag_router)
+        app.include_router(research_router)
 
         return app
 
@@ -122,9 +128,19 @@ class AppBuilder:
         agent_service = AgentService(agent=agent, memory_repo=memory_repo)
         set_service(agent_service)
 
+        # Initialize the research session service (Deep Research agent).
+        research_service = ResearchSessionService(
+            settings=self._settings,
+            rag_service=rag_service,
+        )
+        await research_service.startup()
+        set_research_service(research_service)
+        logger.info("Deep Research service initialized")
+
         yield
 
         # Graceful teardown on shutdown.
+        await research_service.shutdown()
         await agent_service.shutdown()
         await close_valkey()
         await close_engine()

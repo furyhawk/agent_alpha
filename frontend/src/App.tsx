@@ -15,6 +15,7 @@ import {
 } from "./api";
 import AdminDashboard from "./Admin";
 import RagDashboard from "./RagDashboard";
+import ResearchPage from "./pages/ResearchPage";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -265,6 +266,7 @@ export default function App() {
   /* ── Admin state ──────────────────────────────────────────────────── */
   const [showAdmin, setShowAdmin] = useState(false);
   const [showRag, setShowRag] = useState(false);
+  const [showResearch, setShowResearch] = useState(false);
 
   /* ── Session sidebar state ───────────────────────────────────────── */
   const [userSessions, setUserSessions] = useState<UserSessionData[]>([]);
@@ -477,11 +479,15 @@ export default function App() {
   /* ── Admin UI ────────────────────────────────────────────────────── */
 
   if (showAdmin && authenticated.role === "admin") {
-    return <AdminDashboard onBack={() => { setShowAdmin(false); setShowRag(false); }} />;
+    return <AdminDashboard onBack={() => { setShowAdmin(false); setShowRag(false); setShowResearch(false); }} />;
   }
 
   if (showRag && authenticated.role === "admin") {
-    return <RagDashboard onBack={() => { setShowRag(false); setShowAdmin(false); }} />;
+    return <RagDashboard onBack={() => { setShowRag(false); setShowAdmin(false); setShowResearch(false); }} />;
+  }
+
+  if (showResearch) {
+    return <ResearchPage onBack={() => { setShowResearch(false); }} />;
   }
 
   /* ── Chat UI ─────────────────────────────────────────────────────── */
@@ -530,6 +536,20 @@ export default function App() {
           title="View my sessions"
         >
           Sessions
+        </button>
+
+        {/* Deep Research button - accessible to all authenticated users */}
+        <button
+          onClick={() => setShowResearch(true)}
+          className="rounded-lg border border-gray-700 px-3 py-1.5 text-sm text-cyan-400 transition hover:border-cyan-500 hover:text-cyan-300"
+          title="Deep Research Assistant"
+        >
+          <svg className="mr-1 inline-block h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3m0 0l-2 2m2-2l2 2" />
+          </svg>
+          Research
         </button>
 
         {/* Admin button — only for admin role */}

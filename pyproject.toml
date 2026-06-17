@@ -8,13 +8,17 @@ dependencies = [
     "fastapi[standard]>=0.136.3",
     "logfire[asyncpg,fastapi,httpx,sqlite3]>=4.36.0",
     "pydantic-settings>=2.7.0",
-    "pydantic-ai-backend>=0.2.11",
+    "pydantic-ai-backend[docker]>=0.2.11",
     "pydantic-ai-harness[code-mode]>=0.3.0",
     "pydantic-ai-shields>=0.3.4",
     "pydantic-ai-skills>=0.11.0",
     "pydantic-ai-slim[duckduckgo,mcp,openai]>=1.107.0",
     "pydantic-ai-todo>=0.2.4",
-    "pydantic-deep>=0.3.28",
+    "pydantic-deep[web]>=0.3.28",
+    "subagents-pydantic-ai>=0.1.0",
+    "summarization-pydantic-ai>=0.1.0",
+    "markdown>=3.5",
+    "pytz>=2026.2",
     "uvicorn[standard]>=0.34.0",
     "asyncpg>=0.30.0",
     "bcrypt>=4.2.0",
@@ -30,3 +34,6 @@ dependencies = [
     # Hybrid Search (optional: reranker requires sentence-transformers)
     "rank-bm25>=0.2.2",
 ]
+
+[project.optional-dependencies]
+export = ["weasyprint>=60.0"]

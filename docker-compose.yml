@@ -44,6 +44,16 @@ services:
       # the OpenAI-compatible embeddings endpoint (e.g. Ollama, OpenAI).
       - EMBEDDING_BASE_URL=${EMBEDDING_BASE_URL:-http://host.containers.internal:8011/v1}
       - EMBEDDING_API_KEY=${EMBEDDING_API_KEY:-}
+      # Deep Research MCP API keys
+      - TAVILY_API_KEY=${TAVILY_API_KEY:-}
+      - BRAVE_API_KEY=${BRAVE_API_KEY:-}
+      - JINA_API_KEY=${JINA_API_KEY:-}
+      - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY:-}
+      - PLAYWRIGHT_MCP=${PLAYWRIGHT_MCP:-0}
+      - EXCALIDRAW_ENABLED=${EXCALIDRAW_ENABLED:-0}
+      - EXCALIDRAW_SERVER_URL=http://excalidraw-canvas:3000
+      - EXCALIDRAW_CANVAS_URL=http://excalidraw-canvas:3000
+      - PYDANTIC_DEEP_BACKEND_TYPE=${PYDANTIC_DEEP_BACKEND_TYPE:-state}
 
     restart: unless-stopped
     depends_on:
@@ -53,6 +63,12 @@ services:
         condition: service_healthy
       milvus:
         condition: service_started
+    # Docker / Podman socket mount for sandbox session containers.
+    # Podman users: the socket path varies by distro — override DOCKER_SOCK
+    # if needed (e.g. DOCKER_SOCK=/run/user/1000/podman/podman.sock).
+    volumes:
+      - ${DOCKER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock
+      - research_workspaces:/app/workspaces
     # Uncomment to use a local .env file instead of env vars:
     # env_file:
     #   - .env
@@ -159,6 +175,14 @@ services:
     command: server /data --console-address ":9001"
     restart: unless-stopped
 
+  # ── Excalidraw Canvas (for Deep Research diagrams) ──────────────────
+  excalidraw-canvas:
+    image: ghcr.io/yctimlin/mcp_excalidraw-canvas:latest
+    container_name: agent-alpha-excalidraw
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
   # ── Ollama (optional — uncomment to run the LLM locally) ────────
   # ollama:
   #   image: docker.io/ollama/ollama:latest
@@ -182,4 +206,5 @@ volumes:
   milvus_data:
   etcd_data:
   minio_data:
+  research_workspaces:
 #   ollama_data:
