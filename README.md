@@ -138,6 +138,11 @@ make compose-logs       # follow logs
 make compose-down       # stop everything
 ```
 
+> **Podman (rootless)** — the Makefile auto-detects Podman, but if you need the Docker socket path, use:
+> ```bash
+> DOCKER_SOCK=/run/user/1000/podman/podman.sock podman compose up -d
+> ```
+
 > Containers are rebuilt automatically when source changes via the compose build cache. Use `make compose-rebuild` to force a full rebuild.
 
 ---
